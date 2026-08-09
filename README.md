@@ -51,6 +51,16 @@ Run the system half once, then the per-user half for every user who logs
 in on that machine. Both are idempotent and back up before they touch a
 file, so a second user — or a re-run — is safe.
 
+## The docs
+
+* [**00 — The Big Picture**](docs/00-big-picture.md) — quick version first,
+  then the architecture exploded: the two halves, the restore flow, task by
+  task, the supporting machinery, and the honest limits.
+* [**03 — The Decision Journal**](docs/03-decision-journal.md) — every real
+  decision in the kit, with the if/then/buts: why Openbox, why bash, why the
+  firewall has an all-TCP outbound, why the browser assistant is interactive,
+  why the kit split in two.
+
 ## The quick version
 
 1. Net-install Debian trixie. Create a root password and standard system utilities only (Software).
