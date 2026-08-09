@@ -2,6 +2,30 @@
 
 One stick. One button. Hardened, configured, bespoke desktop. Off-line. ka-BAM.
 
+**DORiS — computing the way people who actually compute do it.**
+
+Not tutorials. Not ten-minute videos. Decades of working on commodity
+hardware — a real machine, doing real work, every day — distilled into one
+kit. DORiS is a disposition: a humanist's way of computing, where the machine
+bends to how you think, not the other way around. The hundred hours of "how I
+like my box" finally written down, so a fresh install comes out the other side
+already home.
+
+Everything you need is at the ready — a keybind or a handy alias or a script
+away. All your keys work before you even learn they exist. Everything works
+every time, all of the time, the way you actually want it to. Security is
+built in. Automagic is built in. Of course it is — this is a power user's
+machine. Robust. Reliable. The kind you can be productive on all day.
+
+DORiS builds a workstation you can trust. Offline. From one stick. For any
+amd64 Debian box — and repeatable for every new user who sits down at it. Two
+browsers, configured and hardened for you, of course. Menus, keys, firewall,
+welcome screen. It's a whole 'nother level, right in your pocket.
+
+**Whaddya want for nuthin'?**
+
+---
+
 DORiS is a desktop restoration system for **any amd64 machine** running Debian
 trixie. It recreates the doris desktop (Openbox/X11) plus a hardening layer
 from one kit. Everything the restore needs is vendored inside this repo, so it
