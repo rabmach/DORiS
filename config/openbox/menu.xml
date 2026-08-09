@@ -79,7 +79,7 @@
    </menu>
 <!-- end scrot menu -->
 <!-- scripts-->
- <!--  <menu icon="/usr/share/icons/Dracula/apps/scalable/7596_iexplore.0.svg"  execute="~/bin/procinfo.pl" id="proc-menu" label="Processes"/> -->
+ <menu icon="/usr/share/icons/Dracula/apps/scalable/7596_iexplore.0.svg"  execute="~/bin/procinfo.pl" id="proc-menu" label="Processes"/>
    <menu icon="/usr/share/icons/Dracula/apps/scalable/7765_winebrowser.0.svg"  execute="~/bin/datemenu.py" id="date-menu" label="Forward"/>
   <menu icon="/usr/share/icons/kora/status/scalable/face-cool.svg"  execute="~/bin/recent.sh" id="recent" label="Recent"/> 
    <menu icon="/usr/share/icons/Dracula/apps/scalable/7kaa.svg"  execute="~/bin/places-pipemenu" id="places" label="~/"/> 
