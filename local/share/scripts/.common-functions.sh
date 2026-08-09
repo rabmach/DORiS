@@ -1,0 +1,4056 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2001
+
+# =============================================================================
+# Project: Enhanced File Manager Actions for Linux
+# Author: Cristiano Fraga G. Nunes
+# Repository: https://github.com/cfgnunes/nautilus-scripts
+# License: MIT License
+# Version: 30.15.1
+# =============================================================================
+
+# This file contains functions and constants sourced by scripts.
+
+set -u
+
+#------------------------------------------------------------------------------
+#region Constants
+#------------------------------------------------------------------------------
+
+ACCESSED_RECENTLY_LINKS_TO_KEEP=10
+FIELD_SEPARATOR=$'\r'          # The main field separator.
+GUI_BOX_HEIGHT=550             # Height of the GUI dialog boxes.
+GUI_BOX_WIDTH=900              # Width of the GUI dialog boxes.
+GUI_INFO_WIDTH=400             # Width of the GUI small dialog boxes.
+I18N_DIR="$ROOT_DIR/.po"       # Directory containing PO files for translation.
+IGNORE_FIND_PATH="*.git/*"     # Path to ignore in the 'find' command.
+PREFIX_ERROR_LOG_FILE="Errors" # Basename of 'Error' log file.
+PREFIX_OUTPUT_DIR="Output"     # Basename of 'Output' directory.
+
+# Temporary directories.
+TEMP_DIR=$(mktemp --directory)
+TEMP_DIR_ITEMS_TO_REMOVE="$TEMP_DIR/items_to_remove"
+TEMP_DIR_LOGS="$TEMP_DIR/logs"
+TEMP_DIR_FILENAME_LOCKS="$TEMP_DIR/filename_locks"
+TEMP_DIR_STORAGE_TEXT="$TEMP_DIR/storage_text"
+TEMP_DIR_TASK="$TEMP_DIR/task"
+
+# Temporary files.
+TEMP_CONTROL_BATCH_ENABLED="$TEMP_DIR/control_batch_enabled"
+TEMP_CONTROL_DISPLAY_LOCKED="$TEMP_DIR/control_display_locked"
+TEMP_CONTROL_WAIT_BOX_DELAY="$TEMP_DIR/control_wait_box_delay"
+TEMP_CONTROL_WAIT_BOX_FIFO="$TEMP_DIR/control_wait_box_fifo"
+TEMP_DATA_TEXT_BOX="$TEMP_DIR/data_text_box"
+
+# Message tags for displaying messages on terminal.
+MSG_ERROR="[\033[0;31mFAILED\033[0m]"
+MSG_INFO="[\033[0;32m INFO \033[0m]"
+
+# Defines the priority order of package managers.
+PKG_MANAGER_PRIORITY=(
+    "flatpak"
+    "brew"
+    "nix-env"
+    "apt-get"
+    "rpm-ostree"
+    "dnf"
+    "pacman"
+    "zypper"
+    "guix"
+    "xbps-install"
+)
+
+readonly \
+    ACCESSED_RECENTLY_LINKS_TO_KEEP \
+    FIELD_SEPARATOR \
+    GUI_BOX_HEIGHT \
+    GUI_BOX_WIDTH \
+    GUI_INFO_WIDTH \
+    I18N_DIR \
+    IGNORE_FIND_PATH \
+    PKG_MANAGER_PRIORITY \
+    PREFIX_ERROR_LOG_FILE \
+    PREFIX_OUTPUT_DIR \
+    TEMP_CONTROL_DISPLAY_LOCKED \
+    TEMP_CONTROL_WAIT_BOX_DELAY \
+    TEMP_CONTROL_WAIT_BOX_FIFO \
+    TEMP_DATA_TEXT_BOX \
+    TEMP_DIR \
+    TEMP_DIR_FILENAME_LOCKS \
+    TEMP_DIR_ITEMS_TO_REMOVE \
+    TEMP_DIR_LOGS \
+    TEMP_DIR_STORAGE_TEXT \
+    TEMP_DIR_TASK
+
+#endregion
+#------------------------------------------------------------------------------
+#region Global variables
+#------------------------------------------------------------------------------
+
+# Internal Field Separator based on the value defined in $FIELD_SEPARATOR.
+IFS=$FIELD_SEPARATOR
+
+# List of all input files passed as positional parameters.
+INPUT_FILES=$*
+
+# Variable used to share data between specific parallel task functions
+# (e.g., passwords, configuration values).
+TEMP_DATA_TASK=""
+
+# Array that stores translation key-value pairs loaded from PO files during
+# i18n initialization by '_i18n_initialize'.
+declare -A I18N_DATA=()
+
+#endregion
+#------------------------------------------------------------------------------
+#region Build the structure of the '$TEMP_DIR'
+#------------------------------------------------------------------------------
+
+# Description:
+# - '$TEMP_DIR_FILENAME_LOCKS': This directory is used to store temporary lock
+#     directories created by the '_get_filename_next_suffix' function during
+#     concurrent executions. Each process creates a uniquely named subdirectory
+#     here (using 'mkdir'), which acts as a lightweight synchronization
+#     mechanism. The idea to prevent name conflicts by race conditions when
+#     multiple processes attempt to generate filenames simultaneously.
+# - '$TEMP_DIR_ITEMS_TO_REMOVE': This directory is used for temporary items
+#     scheduled for removal after the scripts' tasks finish executing.
+# - '$TEMP_DIR_LOGS' This directory stores temporary error logs generated
+#     during the execution of the scripts.
+# - '$TEMP_DIR_STORAGE_TEXT': This directory stores text files from output data
+#     produced by parallel tasks during the execution of the scripts.
+# - '$TEMP_DIR_TASK': This directory is used by the '_make_temp_dir' and
+#     '_make_temp_file' functions to store temporary files created during the
+#     scripts' tasks.
+
+mkdir -p "$TEMP_DIR_FILENAME_LOCKS"
+mkdir -p "$TEMP_DIR_ITEMS_TO_REMOVE"
+mkdir -p "$TEMP_DIR_LOGS"
+mkdir -p "$TEMP_DIR_STORAGE_TEXT"
+mkdir -p "$TEMP_DIR_TASK"
+
+#endregion
+#------------------------------------------------------------------------------
+#region Core utilities
+#------------------------------------------------------------------------------
+
+# Function: _cleanup_on_exit
+#
+# Description:
+#   This function performs cleanup tasks when the script exits. Its removes
+#   temporary directories or files that were created during the script's
+#   execution.
+_cleanup_on_exit() {
+    # Remove local temporary dirs or files.
+    local items_to_remove=""
+    items_to_remove=$(cat -- "$TEMP_DIR_ITEMS_TO_REMOVE/"* 2>/dev/null)
+
+    # Escape single quotes in filenames to handle them correctly in 'xargs'
+    # with 'bash -c'.
+    items_to_remove=$(sed -z "s|'|'\\\''|g" <<<"$items_to_remove")
+
+    printf "%s" "$items_to_remove" | xargs \
+        --no-run-if-empty \
+        --delimiter="$FIELD_SEPARATOR" \
+        --max-procs="$(_get_max_procs)" \
+        --replace="{}" \
+        bash -c "{ chmod -R u+rw -- '{}' && rm -rf -- '{}'; } 2>/dev/null"
+
+    # Remove the main temporary dir.
+    { chmod -R u+w -- "$TEMP_DIR" && rm -rf -- "$TEMP_DIR"; } 2>/dev/null
+
+    if ! _is_gui_session; then
+        echo -e "$MSG_INFO $(_i18n 'Done!')" >&2
+    fi
+}
+trap _cleanup_on_exit EXIT
+
+# Function: _exit_script
+#
+# Description:
+#   This function exits the script by terminating all processes.
+_exit_script() {
+    _close_wait_box
+
+    # Lock the main temporary directory to prevent
+    # any active process from writing to it.
+    chmod -R u-w -- "$TEMP_DIR" 2>/dev/null
+
+    local child_pids=""
+    local script_pid=$$
+
+    # Get the process ID (PID) of all child processes.
+    child_pids=$(pstree -p "$script_pid" |
+        grep --only-matching --perl-regexp "\(+\K[^)]+")
+
+    # NOTE: Use 'xargs' and kill to send the SIGTERM signal to all child
+    # processes, including the current script.
+    # See: https://www.baeldung.com/linux/safely-exit-scripts
+    xargs kill <<<"$child_pids" 2>/dev/null
+}
+
+# Function: _check_output
+#
+# Description:
+#   This function checks the output of a command or process based on its exit
+#   code and output. It logs errors if the command fails or if an expected
+#   output file is missing.
+#
+# Parameters:
+#   $1 (exit_code): The exit code returned by the command or process.
+#   $2 (std_output): The standard output or error from the command.
+#   $3 (input_file): The input file (if applicable).
+#   $4 (output_file): The expected output file to verify its existence.
+#
+# Returns:
+#   0 (true): If the command was successful and the output file exists.
+#   1 (false): If the command failed or the output file does not exist.
+_check_output() {
+    local exit_code=$1
+    local std_output=$2
+    local input_file=$3
+    local output_file=$4
+    local msg=""
+
+    # Check the '$exit_code' and log the error.
+    if ((exit_code != 0)); then
+        msg="$(_i18n 'The command failed.')"
+        _log_error "$msg" "$input_file" "$std_output" "$output_file"
+        return 1
+    fi
+
+    # Check if the output file exists.
+    if [[ -n "$output_file" ]] && [[ ! -e "$output_file" ]]; then
+        msg="$(_i18n 'The output file does not exist.')"
+        _log_error "$msg" "$input_file" "$std_output" "$output_file"
+        return 1
+    fi
+
+    return 0
+}
+
+# Function: _log_error
+#
+# Description:
+#   This function writes a temporary log error file with a message.
+#
+# Parameters:
+#   $1 (message): The error message to be logged.
+#   $2 (input_file): The path of the input file.
+#   $3 (std_output): The standard output or result from the operation
+#      that will be logged.
+#   $4 (output_file): The path of the output file associated with the
+#      operation.
+_log_error() {
+    local message=$1
+    local input_file=$2
+    local std_output=$3
+    local output_file=$4
+
+    local log_temp_file=""
+    log_temp_file=$(mktemp --tmpdir="$TEMP_DIR_LOGS" 2>/dev/null) || return 1
+
+    {
+        printf "[%s]\n" "$(date "+%Y-%m-%d %H:%M:%S")"
+        if [[ -n "$input_file" ]]; then
+            printf " > Input file: %s\n" "$input_file"
+        fi
+        if [[ -n "$output_file" ]]; then
+            printf " > Output file: %s\n" "$output_file"
+        fi
+        printf " > %s\n" "Error: $message"
+        if [[ -n "$std_output" ]]; then
+            printf " > Standard output:\n"
+            printf "%s\n" "$std_output"
+        fi
+        printf "\n"
+    } >"$log_temp_file"
+}
+
+# Function: _logs_consolidate
+#
+# Description:
+#   This function compiles all error logs from a temporary directory and into a
+#   single consolidated log file.
+#
+# Parameters:
+#   $1 (output_dir): Optional. The directory where the consolidated log
+#      file will be saved.
+_logs_consolidate() {
+    local output_dir=$1
+    local log_file_output="$output_dir/$PREFIX_ERROR_LOG_FILE.log"
+    local log_files_count=""
+
+    # Do nothing if there are no error log files.
+    log_files_count="$(find "$TEMP_DIR_LOGS" -type f 2>/dev/null | wc -l)"
+    if ((log_files_count == 0)); then
+        return 0
+    fi
+
+    if [[ -z "$output_dir" ]]; then
+        output_dir=$(_get_output_dir "par_use_same_dir=true")
+    fi
+    log_file_output="$output_dir/$PREFIX_ERROR_LOG_FILE.log"
+
+    # If the file already exists, add a suffix.
+    log_file_output=$(_get_filename_next_suffix "$log_file_output")
+
+    # Compile log errors in a single file.
+    {
+        printf "Script: '%s'.\n" "$(_get_script_name)"
+        printf "Total errors: %s.\n\n" "$log_files_count"
+        cat -- "$TEMP_DIR_LOGS/"* 2>/dev/null
+    } >"$log_file_output"
+
+    local log_file=""
+    log_file=$(_str_human_readable_path "$log_file_output")
+    local msg=""
+    msg="$(_i18n 'Finished with errors! See the log:')"
+    _display_error_box "$msg $log_file" "$log_file_output"
+
+    _exit_script
+}
+
+# Function: _run_task_parallel
+#
+# Description:
+#   This function runs a task in parallel for a list of input files, using an
+#   output directory.
+#
+# Parameters:
+#   $1 (input_files): A field-separated list of file paths to process.
+#   $2 (output_dir): The directory where the output files will be stored.
+#   $3 (max_procs): Optional. Maximum number of parallel processes to use.
+_run_task_parallel() {
+    local input_files=$1
+    local output_dir=$2
+    local max_procs=${3:-""}
+
+    # Execute the function '_main_task' for each file in parallel.
+    export -f _main_task
+    _run_function_parallel \
+        "_main_task '{}' '$output_dir'" "$input_files" "$FIELD_SEPARATOR" \
+        "$max_procs"
+}
+
+# Function: _run_function_parallel
+#
+# Description:
+#   This function executes a given Bash expression or command in parallel for
+#   a list of input items. It uses 'xargs' to distribute execution across
+#   multiple processes.
+#
+# Parameters:
+#   $1 (expression): The Bash expression or command to execute for each item.
+#      The '{}' placeholder inside the expression will be replaced by the
+#      current item being processed.
+#   $2 (items): A list of items to process, separated by the char delimiter.
+#   $3 (delimiter): The character used to separate items in the input list.
+#   $4 (max_procs): Optional. Maximum number of parallel processes to use.
+_run_function_parallel() {
+    local expression=$1
+    local items=$2
+    local delimiter=$3
+    local max_procs=${4:-""}
+
+    if [[ -z "$max_procs" ]]; then
+        max_procs=$(_get_max_procs)
+    fi
+
+    # Export necessary environment variables so they are available
+    # within each subshell created by 'xargs'.
+    export \
+        FIELD_SEPARATOR \
+        GUI_BOX_HEIGHT \
+        GUI_BOX_WIDTH \
+        GUI_INFO_WIDTH \
+        IGNORE_FIND_PATH \
+        INPUT_FILES \
+        TEMP_CONTROL_DISPLAY_LOCKED \
+        TEMP_DATA_TASK \
+        TEMP_DATA_TEXT_BOX \
+        TEMP_DIR_FILENAME_LOCKS \
+        TEMP_DIR_ITEMS_TO_REMOVE \
+        TEMP_DIR_LOGS \
+        TEMP_DIR_STORAGE_TEXT \
+        TEMP_DIR_TASK
+
+    # Export functions so they can be called inside
+    # the parallel subprocesses executed by 'bash -c'.
+    export -f \
+        _check_output \
+        _cmd_magick_convert \
+        _command_exists \
+        _convert_delimited_string_to_text \
+        _convert_text_to_delimited_string \
+        _directory_pop \
+        _directory_push \
+        _display_lock \
+        _display_unlock \
+        _display_password_box \
+        _exit_script \
+        _get_dirname \
+        _get_element \
+        _get_file_encoding \
+        _get_file_mime \
+        _get_filename_extension \
+        _get_filename_full_path \
+        _get_filename_next_suffix \
+        _get_max_procs \
+        _get_output_filename \
+        _make_temp_dir \
+        _make_temp_dir_local \
+        _make_temp_file \
+        _get_working_directory \
+        _i18n \
+        _is_directory_empty \
+        _is_gui_session \
+        _log_error \
+        _move_file \
+        _storage_text_write \
+        _storage_text_write_ln \
+        _str_collapse_char \
+        _strip_filename_extension \
+        _text_remove_empty_lines \
+        _text_remove_pwd \
+        _text_uri_decode \
+        _translate_to_gvfs_path
+
+    # Escape single quotes in items to handle them correctly in 'xargs'
+    # with 'bash -c'.
+    items=$(sed -z "s|'|'\\\''|g" <<<"$items")
+
+    # Execute the given expression in parallel for each item.
+    printf "%s" "$items" | xargs \
+        --no-run-if-empty \
+        --delimiter="$delimiter" \
+        --max-procs="$max_procs" \
+        --replace="{}" \
+        bash -c "$expression"
+}
+
+#endregion
+#------------------------------------------------------------------------------
+#region Dependency management
+#------------------------------------------------------------------------------
+
+# Function: _command_exists
+#
+# Description:
+#   This function checks whether a given command is available on the system.
+#
+# Parameters:
+#   $1 (command_check): The name of the command to verify.
+#
+# Returns:
+#   0 (true): If the command is available.
+#   1 (false): If the command is not available.
+_command_exists() {
+    local command_check=$1
+
+    command -v "$command_check" &>/dev/null || return 1
+}
+
+# Function: _check_dependencies_clipboard
+#
+# Description:
+#   This function checks that clipboard-related dependencies are available
+#   according to the current display session type.
+#
+# Parameters:
+#   $1 (dep_keys): Base list of dependency keys to check before adding
+#   session-specific clipboard dependencies.
+_check_dependencies_clipboard() {
+    local dep_keys=$1
+    local dep_keys_final="$dep_keys "
+
+    # Try to determine the session type.
+    local session_type="${XDG_SESSION_TYPE:-}"
+
+    # Fallback detection in case '$XDG_SESSION_TYPE' is empty.
+    if [[ -z "$session_type" ]]; then
+        if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
+            session_type="wayland"
+        elif [[ -n "${DISPLAY:-}" ]]; then
+            session_type="x11"
+        fi
+    fi
+
+    case "$session_type" in
+    "wayland") dep_keys_final+="wl-paste" ;;
+    "x11") dep_keys_final+="xclip" ;;
+    *)
+        local msg=""
+        msg="$(_i18n 'Your system does not support clipboard operations.')"
+        _display_error_box "$msg"
+        _exit_script
+        ;;
+    esac
+
+    _check_dependencies "$dep_keys_final"
+}
+
+# Function: _check_dependencies
+#
+# Description:
+#   This function checks each dependency key, determines the correct package
+#   for the active package manager, and installs missing packages if necessary.
+#
+# Parameters:
+#   $1 (dep_keys): A list of dependency keys. The list can be delimited either
+#      by a space ' ', a comma ',' or by a newline '\n'. These keys and its
+#      values are defined on file '.pkg-map.sh'.
+_check_dependencies() {
+    local dep_keys=$1
+
+    [[ -z "$dep_keys" ]] && return
+
+    # Step 1: Normalize and remove duplicates from the dependency list.
+    dep_keys=$(tr "\n" " " <<<"$dep_keys")
+    dep_keys=$(tr "," " " <<<"$dep_keys")
+    dep_keys=$(_str_sort "$dep_keys" " " "true")
+
+    # List of pairs in the format "<pkg_manager>:<package>".
+    local pairs=""
+
+    # Step 2: Resolve the package names for each dependency key.
+    #
+    # This creates a list of pairs in the format "<pkg_manager>:<package>".
+    # The first available package manager in '$PKG_MANAGER_PRIORITY'
+    # that provides the dependency definition will be used.
+    dep_keys=$(tr " " "$FIELD_SEPARATOR" <<<"$dep_keys")
+    local dep_key=""
+    for dep_key in $dep_keys; do
+        local package_names=""
+        _command_exists "$dep_key" && continue
+
+        # Try to find a defined package for an available package manager.
+        local definitions_found="false"
+        local pkg_manager=""
+        for pkg_manager in "${PKG_MANAGER_PRIORITY[@]}"; do
+            if ! _command_exists "$pkg_manager"; then
+                continue
+            fi
+
+            # Retrieve the package names from '.pkg-map.sh'.
+            package_names=$(_deps_get_dependency_value \
+                "$dep_key" "$pkg_manager" "PKG_MAP")
+
+            if [[ -n "$package_names" ]]; then
+                definitions_found="true"
+                break
+            fi
+        done
+        # Abort if no package definition was found.
+        if [[ "$definitions_found" == "false" ]]; then
+            local msg=""
+            msg="$(_i18n 'Could not find a package for:')"
+            _display_error_box "$msg $dep_key"
+            _exit_script
+        fi
+
+        # Append resolved packages as "<pkg_manager>:<package>" pairs.
+        if [[ -n "$package_names" ]]; then
+            package_names=$(sed "s|^|$pkg_manager:|g" <<<"$package_names")
+            package_names=$(sed "s| | $pkg_manager:|g" <<<"$package_names")
+            pairs+=" $package_names"
+        fi
+    done
+
+    # Sort and prepare the list of package pairs.
+    pairs=$(_str_sort "$pairs" " " "true")
+
+    # Step 3: Verify which packages need installation.
+    local post_install_full=""
+    local packages_install=""
+
+    # Iterate over each "<pkg_manager>:<package>" pair.
+    pairs=$(tr " " "$FIELD_SEPARATOR" <<<"$pairs")
+    local pair=""
+    for pair in $pairs; do
+        local pkg_manager="${pair%%:*}"
+        local package="${pair#*:}"
+        local post_install=""
+
+        # Skip if the package is already available.
+        if _deps_is_package_installed "$pkg_manager" "$package"; then
+            continue
+        fi
+
+        # Retrieve post-install command.
+        post_install=$(_deps_get_dependency_value \
+            "$package" "$pkg_manager" "POST_INSTALL")
+
+        # Add package and post-install commands to the respective lists.
+        [[ -n "$package" ]] && packages_install+=" $pkg_manager:$package"
+        if [[ -n "$post_install" ]]; then
+            # Append post-install commands. Each entry must follow the format
+            # "<pkg_manager>:<commands>" and be separated by '\n'.
+            post_install_full+="$pkg_manager:$post_install;"$'\n'
+        fi
+    done
+
+    # Step 4: Install missing packages and execute post-install actions.
+    _deps_install_missing_packages "$packages_install" "$post_install_full"
+}
+
+# Function: _deps_get_dependency_value
+#
+# Description:
+#   This function retrieves the value associated with a specific key-subkey
+#   pair from an array.
+#
+# Parameters:
+#   $1 (key): The key whose value is being queried.
+#   $2 (pkg_manager): The package manager to match.
+#   $3 (_input_array): The name of the array that contains
+#      the mappings (<subkey>:<value> pairs).
+#
+# Returns:
+#   0 (true): If a matching value is found and printed.
+#   1 (false): If no matching value is found.
+_deps_get_dependency_value() {
+    local key=$1
+    local pkg_manager=$2
+    local -n _input_array=$3
+    local pairs=""
+
+    # Source the configuration file that defines the mapping between commands,
+    # packages, and package managers. This file is used by the scripts to check
+    # and resolve their dependencies.
+    if [[ ! -v "PACKAGE_NAME" ]]; then
+        source "$ROOT_DIR/.pkg-map.sh"
+    fi
+
+    # Retrieve the raw value from the array.
+    pairs=${_input_array[$key]:-}
+
+    # Remove leading, trailing and duplicate spaces.
+    pairs=$(_str_collapse_char "$pairs" " ")
+
+    # If the key does not exist or has no associated values, return failure.
+    if [[ -z "$pairs" ]]; then
+        return 0
+    fi
+
+    # Replace newlines with '$FIELD_SEPARATOR' for iteration.
+    pairs=$(tr "\n" "$FIELD_SEPARATOR" <<<"$pairs")
+
+    # Iterate over each <package_manager>:<key_value> pair.
+    local pair=""
+    for pair in $pairs; do
+        local subkey="${pair%%:*}"
+        local value="${pair#*:}"
+
+        # Remove leading, trailing and duplicate spaces.
+        subkey=$(_str_collapse_char "$subkey" " ")
+        value=$(_str_collapse_char "$value" " ")
+
+        # Map equivalent package managers for compatibility, including
+        # mapping aliases to the correct installer command name.
+        case "$subkey:$pkg_manager" in
+        "apt:apt-get" | "dnf:rpm-ostree" | "xbps:xbps-install" | "nix:nix-env")
+            subkey=$pkg_manager
+            ;;
+        esac
+
+        # Special handling for Termux (Android): Since Termux uses its own
+        # package ecosystem and may share paths with 'proot-distro', check if
+        # it's a real Termux session by checking that the '$subkey' is
+        # "termux", '$HOME' contains "com.termux", and the system is "Android".
+        if [[ "$subkey" == "termux" ]] &&
+            [[ "${HOME:-}" == *"com.termux"* ]] &&
+            [[ "$(uname -o)" == "Android" ]]; then
+            printf "%s" "$value"
+            return 0
+        fi
+
+        # If the package manager matches, print and exit successfully.
+        if [[ "$subkey" == "$pkg_manager" ]] || [[ "$subkey" == "*" ]]; then
+            printf "%s" "$value"
+            return 0
+        fi
+    done
+
+    # If no match was found, return failure.
+    return 1
+}
+
+_deps_install_missing_packages() {
+    local packages_install=$1
+    local post_install=$2
+
+    [[ -z "$packages_install" ]] && return
+
+    # Remove leading, trailing and duplicate spaces.
+    packages_install=$(_str_collapse_char "$packages_install" " ")
+
+    # Format the package names for display.
+    local pkg_names=""
+    pkg_names=$(tr " " "\n" <<<"$packages_install")
+    pkg_names=$(sed "s|~[^\n]*||g" <<<"$pkg_names")
+    pkg_names=$(sed "s|^\([a-z-]*\):\(.*\)|- \2 (\1)|g" <<<"$pkg_names")
+
+    local msg=""
+    msg+="$(_i18n 'The following packages are missing:')"
+    msg+="\n"
+    msg+="$pkg_names"
+    msg+="\n\n"
+    msg+="$(_i18n 'Would you like to install them?')"
+    if ! _display_question_box "$msg"; then
+        _exit_script
+    fi
+    _deps_install_packages "$packages_install" "$post_install"
+    _deps_installation_check "$packages_install"
+}
+
+# Function: _deps_install_packages
+#
+# Description:
+#   This function installs packages using the corresponding package manager
+#   defined for each one. The input list must contain pairs in the format
+#   "<pkg_manager>:<package>" separated by spaces.
+#
+# Parameters:
+#   $1 (pkg_list): A space-separated list of "<pkg_manager>:<package>" pairs.
+#   $2 (post_install): Optional. Command executed after all installations.
+#
+# Example:
+# _deps_install_packages "apt-get:curl dnf:wget brew:git"
+_deps_install_packages() {
+    local pairs=$1
+    local post_install=$2
+    local cmd_admin=""
+    local cmd_admin_available=""
+    local cmd_inst=""
+    local -A pkg_map=()
+
+    # Replace spaces with '$FIELD_SEPARATOR' for iteration.
+    pairs=$(tr " " "$FIELD_SEPARATOR" <<<"$pairs")
+
+    # Build a map of <pkg_manager> -> "pkg1 pkg2 ...".
+    local pair=""
+    for pair in $pairs; do
+        local pkg_manager="${pair%%:*}"
+        local package="${pair#*:}"
+        pkg_map["$pkg_manager"]+="$package "
+    done
+
+    # Determine admin command.
+    if ! _is_gui_session; then
+        _command_exists "sudo" && cmd_admin_available="sudo"
+    else
+        _command_exists "pkexec" && cmd_admin_available="pkexec"
+    fi
+
+    local msg=""
+    msg="$(_i18n 'Installing the packages. Please, wait...')"
+    _display_wait_box_message "$msg" "0"
+
+    # Iterate over each detected package manager.
+    for pkg_manager in "${!pkg_map[@]}"; do
+        local packages="${pkg_map[$pkg_manager]}"
+        packages=$(_str_collapse_char "$packages" " ")
+        packages=$(sed "s|~[^ ]*||g" <<<"$packages")
+        [[ -z "$packages" ]] && continue
+
+        cmd_inst=""
+        cmd_admin="$cmd_admin_available"
+
+        # Define installation commands depending on the package manager.
+        case "$pkg_manager" in
+        "apt-get")
+            cmd_inst+="apt-get update;"
+            cmd_inst+="apt-get -y install $packages"
+            ;;
+        "brew")
+            # Configure Homebrew for non-interactive and less verbose
+            # operation.
+            export HOMEBREW_VERBOSE=""
+            export HOMEBREW_NO_ANALYTICS=1
+            export HOMEBREW_NO_AUTO_UPDATE=1
+            export HOMEBREW_NO_COLOR=1
+            export HOMEBREW_NO_EMOJI=1
+            export HOMEBREW_NO_ENV_HINTS=1
+            export HOMEBREW_NO_GITHUB_API=1
+
+            # Replace spaces with '$FIELD_SEPARATOR' for iteration.
+            packages=$(tr " " "$FIELD_SEPARATOR" <<<"$packages")
+
+            # Homebrew: prioritize precompiled bottles instead of source
+            # builds. Dependencies are installed first, followed by the main
+            # packages.
+
+            # Each package is installed separately because installing multiple
+            # packages at once can break dependency resolution when using
+            # '--force-bottle'.
+            local pkg=""
+            for pkg in $packages; do
+                # Install all dependencies (recursively) using bottles.
+                cmd_inst+="brew deps --topological $pkg 2>/dev/null | "
+                cmd_inst+="xargs --no-run-if-empty -I{} "
+                cmd_inst+="brew install --force-bottle {};"
+                # Install the requested packages themselves.
+                cmd_inst+="brew install --force-bottle $pkg;"
+            done
+            cmd_inst=$(_str_collapse_char "$cmd_inst" ";")
+
+            # Homebrew runs as a non-root user.
+            cmd_admin=""
+            ;;
+        "dnf")
+            cmd_inst+="dnf check-update;"
+            cmd_inst+="dnf -y install $packages"
+            ;;
+        "flatpak")
+            cmd_inst+="flatpak install -y $packages"
+            ;;
+        "guix")
+            cmd_inst="guix package -i $packages"
+            ;;
+        "nix-env")
+            local nix_packages=""
+            local nix_channel="nixpkgs"
+            if grep --quiet "ID=nixos" /etc/os-release 2>/dev/null; then
+                nix_channel="nixos"
+            fi
+
+            # Prefix packages with their channel namespace.
+            nix_packages="$nix_channel.$packages"
+            nix_packages=$(sed "s| $||g" <<<"$nix_packages")
+            nix_packages=$(sed "s| | $nix_channel.|g" <<<"$nix_packages")
+
+            cmd_inst+="nix-env -iA $nix_packages"
+            # Nix does not require root for installing user packages.
+            cmd_admin=""
+            ;;
+        "pacman")
+            cmd_inst+="pacman -Syy;"
+            cmd_inst+="pacman --noconfirm -S $packages"
+            ;;
+        "rpm-ostree")
+            cmd_inst+="rpm-ostree install $packages"
+            ;;
+        "xbps-install")
+            cmd_inst+="xbps-install -S;"
+            cmd_inst+="xbps-install -y -u xbps;"
+            cmd_inst+="xbps-install -y $packages"
+            ;;
+        "zypper")
+            cmd_inst+="zypper refresh;"
+            cmd_inst+="zypper --non-interactive install $packages"
+            ;;
+        esac
+
+        # Execute installation.
+        if [[ -n "$cmd_inst" ]]; then
+            # Process post-install commands (if any). Each entry must follow
+            # the format "<pkg_manager>:<commands>" and be separated by newline
+            # characters '\n'.
+            if [[ -n "$post_install" ]]; then
+                local post_install_sel=""
+                post_install_sel=$(grep "^$pkg_manager:" <<<"$post_install")
+                post_install_sel=$(cut -d ":" -f 2- <<<"$post_install_sel")
+                post_install_sel=$(tr -d "\n" <<<"$post_install_sel")
+
+                if [[ -n "$post_install_sel" ]]; then
+                    cmd_inst="$cmd_inst; $post_install_sel"
+                fi
+            fi
+
+            # If root privileges are required, prepend with 'sudo' or 'pkexec'.
+            $cmd_admin bash -c "$cmd_inst" &>/dev/null
+        fi
+    done
+
+    # Close the installation progress dialog.
+    _close_wait_box
+}
+
+# Function: _deps_installation_check
+#
+# Description:
+#   This function verifies whether the packages were successfully installed
+#   using their respective package managers. It checks each pair in the format
+#   "<pkg_manager>:<package>" one by one, ensuring that all dependencies are
+#   properly installed before proceeding.
+#
+# Parameters:
+#   $1 (pairs_check): A space-separated list of "<pkg_manager>:<package>".
+_deps_installation_check() {
+    local pairs=$1
+    local msg=""
+
+    # Replace spaces with '$FIELD_SEPARATOR' for iteration.
+    pairs=$(tr " " "$FIELD_SEPARATOR" <<<"$pairs")
+
+    # Iterate over each "<pkg_manager>:<package>" pair.
+    local pair=""
+    for pair in $pairs; do
+        local pkg_manager="${pair%%:*}"
+        local package="${pair#*:}"
+
+        if _deps_is_package_installed "$pkg_manager" "$package"; then
+            continue
+        fi
+
+        # Special case for 'rpm-ostree'.
+        if [[ "$pkg_manager" == "rpm-ostree" ]]; then
+            _deps_check_rpm_ostree_requires_reboot "$package"
+        fi
+
+        # If the package could not be installed, show an error and exit.
+        msg="$(_i18n 'Could not install the package:')"
+        _display_error_box "$msg $package ($pkg_manager)!"
+        _exit_script
+    done
+}
+
+# Function: _deps_check_rpm_ostree_requires_reboot
+#
+# Description:
+#   This function checks if a package installed via 'rpm-ostree' requires a
+#   system reboot to take effect. If the package is found in the current
+#   deployment list, it indicates that a reboot is necessary.
+#
+# Parameters:
+#   $1 (package): The name of the package to check.
+_deps_check_rpm_ostree_requires_reboot() {
+    local package=$1
+    local msg=""
+    msg="$(_i18n 'The package was installed, but a system reboot is required.')"
+
+    # Check if the package appears in the 'rpm-ostree' deployment list.
+    if rpm-ostree status --json | jq -r ".deployments[0].packages[]" |
+        grep -qxF "$package"; then
+        _display_info_box "$msg ($package)"
+        _exit_script
+    fi
+}
+
+# Function: _deps_is_package_installed
+#
+# Description:
+#   This function checks if a specific package is installed using the given
+#   package manager.
+#
+# Parameters:
+#   $1 (pkg_manager): The package manager to use for the check.
+#      Supported values:
+#      - "apt-get"      : For Debian/Ubuntu systems.
+#      - "brew"         : For Homebrew package manager.
+#      - "dnf"          : For Fedora/RHEL systems.
+#      - "flatpak"      : For Flatpak packages.
+#      - "guix"         : For GNU Guix systems.
+#      - "nix-env"      : For Nix-based systems.
+#      - "pacman"       : For Arch Linux systems.
+#      - "rpm-ostree"   : For Fedora Atomic systems.
+#      - "xbps-install" : For Void Linux systems.
+#      - "zypper"       : For openSUSE systems.
+#   $2 (package): The name of the package to check.
+#
+# Returns:
+#   0 (true): If the package is installed.
+#   1 (false): If the package is not installed or an error occurs.
+_deps_is_package_installed() {
+    local pkg_manager=$1
+    local package=$2
+
+    # Keep only the package name after '~' for verification, used when install
+    # and check package names differ (e.g., on NixOS).
+    if [[ "$package" == *"~"* ]]; then
+        package=$(sed "s|[A-Za-z0-9.-]*~||g" <<<"$package")
+    fi
+
+    case "$pkg_manager" in
+    "apt-get")
+        if dpkg -s "$package" &>/dev/null; then
+            return 0
+        fi
+        ;;
+    "brew")
+        if brew list | grep -qxF "$package"; then
+            return 0
+        fi
+        ;;
+    "dnf")
+        if dnf repoquery --installed --qf "%{name}\n" |
+            grep -qxF "$package"; then
+            return 0
+        fi
+        ;;
+    "flatpak")
+        if flatpak list --app --columns=application |
+            grep -qxF "$package"; then
+            return 0
+        fi
+        ;;
+    "guix")
+        if guix package -I "$package" &>/dev/null; then
+            return 0
+        fi
+        ;;
+    "nix-env")
+        if nix-env -q | grep --quiet "^$package"; then
+            return 0
+        fi
+        ;;
+    "pacman")
+        if pacman -Q "$package" &>/dev/null; then
+            return 0
+        fi
+        ;;
+    "rpm-ostree")
+        _deps_check_rpm_ostree_requires_reboot "$package"
+        if rpm -qa --qf "%{name}\n" | grep -qxF "$package"; then
+            return 0
+        fi
+        ;;
+    "xbps-install")
+        if xbps-query -l | grep -q "^ii $package-"; then
+            return 0
+        fi
+        ;;
+    "zypper")
+        if zypper search --installed-only "$package" | grep --quiet "^i"; then
+            return 0
+        fi
+        ;;
+    esac
+    return 1
+}
+
+#endregion
+#------------------------------------------------------------------------------
+#region File and directory management
+#------------------------------------------------------------------------------
+
+# Function: _delete_items
+#
+# Description:
+#   This function deletes files or directories, either by moving them to the
+#   trash (if supported) or by permanently deleting them.
+_delete_items() {
+    local items=$1
+
+    local items_count=""
+    items_count=$(_get_items_count "$items")
+
+    local msg=""
+    msg+="$(_i18n 'This action will delete the selected items.')"
+    msg+="\n"
+    msg+="$(_i18n 'Total selected:')"
+    msg+=" $items_count"
+    msg+="\n\n"
+    msg+="$(_i18n 'Would you like to continue?')"
+
+    if ! _display_question_box "$msg"; then
+        return
+    fi
+
+    # shellcheck disable=SC2086
+    if _command_exists "gio"; then
+        gio trash -- $items 2>/dev/null
+    elif _command_exists "kioclient"; then
+        kioclient move -- $items trash:/ 2>/dev/null
+    elif _command_exists "gvfs-trash"; then
+        gvfs-trash -- $items 2>/dev/null
+    else
+        rm -rf -- $items 2>/dev/null
+    fi
+
+    # Verify if all items were deleted.
+    local failed_items=""
+    local item=""
+    for item in $items; do
+        if [[ -e "$item" ]]; then
+            failed_items+="$item"$'\n'
+        fi
+    done
+
+    if [[ -n "$failed_items" ]]; then
+        msg="$(_i18n 'Some items could not be deleted.')"
+        _log_error "$msg" "" "$failed_items" ""
+        _logs_consolidate ""
+    else
+        msg="$(_i18n 'All items were successfully deleted!')"
+        _display_info_box "$msg"
+    fi
+}
+
+# Function: _directory_pop
+#
+# Description:
+#   This function pops the top directory off the stack and changes to the
+#   previous directory.
+#
+# Returns:
+#   0 (true): If the directory was successfully popped and changed.
+#   1 (false): If there was an error popping the directory.
+_directory_pop() {
+    popd &>/dev/null || return 1
+    return 0
+}
+
+# Function: _directory_push
+#
+# Description:
+#   This function pushes the directory onto the stack and changes to it.
+#
+# Parameters:
+#   $1 (directory): The target directory to push onto the stack
+#      and navigate to.
+#
+# Returns:
+#   0 (true): If the directory was successfully pushed and changed.
+#   1 (false): If there was an error pushing the directory.
+_directory_push() {
+    local directory=$1
+
+    pushd "$directory" &>/dev/null || {
+        local msg=""
+        msg="$(_i18n 'Could not access the directory:')"
+        _log_error "$msg $directory" "" "" ""
+        return 1
+    }
+    return 0
+}
+
+# Function: _find_filtered_files
+#
+# Description:
+#   This function filters a list of files or directories.
+#
+# Parameters:
+#   $1 (input_files): A space-separated string containing file or
+#      directory paths to filter. These paths are passed to the 'find'
+#      command.
+#   $2 (par_type): A string specifying the type of file to search for.
+#      Supported values:
+#      - "file": To search for files and symbolic links.
+#      - "directory": To search for directories and symbolic links.
+#   $3 (par_select_extension): A string of file extensions to include in
+#      the search. Only files with matching extensions will be included.
+#   $4 (par_skip_extension): A string of file extensions to exclude from
+#      the search. Only files with extensions not matching this list will be
+#      included.
+#   $5 (par_find_parameters): Optional. Additional parameters to be
+#      passed directly to the 'find' command.
+#
+# Example:
+#   - Input: "dir1 dir2", "file", "", "txt|pdf", "true"
+#   - Output: A list of files with extensions ".txt" or ".pdf" from the
+#     directories "dir1" and "dir2", searched recursively.
+_find_filtered_files() {
+    local input_files=$1
+    local par_type=$2
+    local par_select_extension=$3
+    local par_skip_extension=$4
+    local par_find_parameters=$5
+    local filtered_files=""
+    local find_command=""
+
+    input_files=$(sed "s|'|'\"'\"'|g" <<<"$input_files")
+    input_files=$(sed "s|$FIELD_SEPARATOR|' '|g" <<<"$input_files")
+
+    # Build a 'find' command.
+    find_command="find '$input_files'"
+
+    find_command+=" ! -path \"$IGNORE_FIND_PATH\""
+
+    if [[ -n "$par_find_parameters" ]]; then
+        find_command+=" $par_find_parameters"
+    fi
+
+    # Expand the directories with the 'find' command.
+    case "$par_type" in
+    "file") find_command+=" \( -type l -o -type f \)" ;;
+    "directory") find_command+=" \( -type l -o -type d \)" ;;
+    esac
+
+    if [[ -n "$par_select_extension" ]] || [[ -n "$par_skip_extension" ]]; then
+        find_command+=" -regextype posix-extended "
+        if [[ -n "$par_select_extension" ]]; then
+            find_command+=" -iregex \".*\.($par_select_extension)$\""
+        fi
+
+        if [[ -n "$par_skip_extension" ]]; then
+            find_command+=" ! -iregex \".*\.($par_skip_extension)$\""
+        fi
+    fi
+
+    find_command+=" -print0"
+
+    # shellcheck disable=SC2086
+    filtered_files=$(eval $find_command 2>/dev/null |
+        tr "\0" "$FIELD_SEPARATOR")
+
+    _str_collapse_char "$filtered_files" "$FIELD_SEPARATOR"
+}
+
+# Function: _get_dirname
+#
+# Description:
+#   This function extracts the directory path from a given file path.
+#
+# Parameters:
+#   $1 (input_filename): The full path or relative path to the file.
+_get_dirname() {
+    local input_filename=$1
+    local dir=""
+
+    dir=$(cd -- "$(dirname -- "$input_filename")" &>/dev/null && pwd)
+
+    printf "%s" "$dir"
+}
+
+# Function: _get_filename_extension
+#
+# Description:
+#   This function extracts the file extension from a given filename.
+#
+# Parameters:
+#   $1 (filename): The input filename (can be absolute or relative).
+_get_filename_extension() {
+    local filename=$1
+    filename=$(sed -E "s|.*/(\.)*||g" <<<"$filename")
+    filename=$(sed -E "s|^(\.)*||g" <<<"$filename")
+
+    grep --ignore-case --only-matching --perl-regexp \
+        "(\.tar)?\.[a-z0-9_~-]{0,15}$" <<<"$filename"
+}
+
+# Function: _strip_filename_extension
+#
+# Description:
+#   This function removes the extension from a given filename.
+#
+# Parameters:
+#   $1 (filename): The filename from which to strip the extension.
+_strip_filename_extension() {
+    local filename=$1
+    local extension=""
+    extension=$(_get_filename_extension "$filename")
+
+    if [[ -z "$extension" ]]; then
+        printf "%s" "$filename"
+        return 0
+    fi
+
+    local len_extension=${#extension}
+    filename=${filename::-len_extension}
+    printf "%s" "$filename"
+}
+
+# Function: _get_filename_full_path
+#
+# Description:
+#   This function returns the full absolute path of a given filename.
+#
+# Parameters:
+#   $1 (input_filename): The input filename or relative path.
+_get_filename_full_path() {
+    local input_filename=$1
+    local full_path=$input_filename
+    local dir=""
+
+    if [[ $input_filename != "/"* ]]; then
+        dir=$(_get_dirname "$input_filename")
+        full_path=$dir/$(basename -- "$input_filename")
+    fi
+
+    printf "%s" "$full_path"
+}
+
+# Function: _get_filename_next_suffix
+#
+# Description:
+#   This function generates a unique filename by adding a numeric suffix (e.g.
+#   "file (2)", "file (3)", ...) if a file with the same name already exists.
+#   This function is designed to work safely when multiple processes run
+#   concurrently, preventing race conditions that could otherwise lead to
+#   duplicated or overwritten files.
+#
+#   To avoid race conditions, this function uses 'mkdir' as a synchronization.
+#   The command 'mkdir' is ATOMIC, meaning that only one process can
+#   successfully create a directory with a given name at any instant. If
+#   another process tries to create the same directory at the same time, it
+#   will fail immediately.
+#
+# Parameters:
+#   $1 (filename): The input filename or path. This can be an absolute or
+#      relative filename. If the input file has an extension, it will be
+#      stripped for the purpose of generating the new filename.
+_get_filename_next_suffix() {
+    local filename=$1
+    local filename_result=$filename
+    local filename_base=""
+    local filename_extension=""
+
+    # Directories do not have an extension.
+    if [[ -d "$filename" ]]; then
+        filename_base=$filename
+    else
+        filename_base=$(_strip_filename_extension "$filename")
+        filename_extension=$(_get_filename_extension "$filename")
+    fi
+
+    # Avoid overwriting a file. If there is a file with the same name,
+    # try to add a suffix, as 'file (2)', 'file (3)', ...
+    local count=2
+    local max_attempts=10000
+
+    while ((count < max_attempts)); do
+
+        # Create a temporary lock directory under '$TEMP_DIR_FILENAME_LOCKS'.
+        # The directory name mirrors the candidate filename and serves as an
+        # atomic claim for that name.
+        local filename_lock="$TEMP_DIR_FILENAME_LOCKS/"
+        filename_lock+=$(basename -- "$filename_result")
+
+        # The 'mkdir' succeeds only if the directory does NOT already exist.
+        # This makes the operation atomic:  only one process can succeed here.
+        if mkdir "$filename_lock" 2>/dev/null &&
+            [[ ! -e "$filename_result" ]]; then
+
+            # Return the chosen filename and exit.
+            printf "%s" "$filename_result"
+            return 0
+        fi
+
+        # If mkdir failed, another process of the task claimed this name,
+        # try the next suffix.
+        filename_result="$filename_base ($count)$filename_extension"
+        ((count++))
+    done
+
+    # Fallback: if all attempts fail (very unlikely), return the original name.
+    printf "%s" "$filename"
+}
+
+# Function: _make_temp_dir
+#
+# Description:
+#   This function creates a temporary directory in the '$TEMP_DIR_TASK'
+#   directory and returns its path. The directory is created using 'mktemp',
+#   and the directory for the temporary directory is defined by the
+#   '$TEMP_DIR_TASK' variable.
+_make_temp_dir() {
+    mktemp --directory --tmpdir="$TEMP_DIR_TASK"
+}
+
+# Function: _make_temp_dir_local
+#
+# Description:
+#   This function creates a temporary directory in a location and returns its
+#   path. The directory is created using 'mktemp', with a custom prefix
+#   (basename). It also generates a temporary file to track the directory to be
+#   removed later.
+#
+# Parameters:
+#   $1 (output_dir): The directory where the temporary directory will be
+#      created.
+#   $2 (basename): The prefix for the temporary directory name.
+_make_temp_dir_local() {
+    local output_dir=$1
+    local basename=$2
+    local temp_dir=""
+    temp_dir=$(mktemp --directory \
+        --tmpdir="$output_dir" "$basename.XXXXXXXX.tmp")
+
+    # Remember to remove this directory after exit.
+    item_remove=$(mktemp --tmpdir="$TEMP_DIR_ITEMS_TO_REMOVE" 2>/dev/null) ||
+        return 1
+    printf "%s$FIELD_SEPARATOR" "$temp_dir" >"$item_remove"
+
+    printf "%s" "$temp_dir"
+}
+
+# Function: _make_temp_file
+#
+# Description:
+#   This function creates a temporary file in the '$TEMP_DIR_TASK' directory
+#   and returns its path. The file is created using 'mktemp', and the directory
+#   for the temporary file is defined by the '$TEMP_DIR_TASK' variable.
+_make_temp_file() {
+    mktemp --tmpdir="$TEMP_DIR_TASK" 2>/dev/null
+}
+
+# Function: _move_file
+#
+# Description:
+#   This function moves a file from the source location to the destination,
+#   with options to handle conflicts when the destination file already exists.
+#
+# Parameters:
+#   $1 (par_when_conflict): Optional, default: "skip". Defines the
+#      behavior when the destination file already exists.
+#      Supported values:
+#      - "rename": Rename the source file to avoid conflicts by adding a
+#         suffix to the destination filename.
+#      - "skip": Skip moving the file if the destination file exists.
+#      - "safe_overwrite": Safely overwrite the destination file, preserving
+#        its permissions and creating a backup.
+#   $2 (file_src): The path to the source file to be moved.
+#   $3 (file_dst): The destination path where the file should be moved.
+#
+# Returns:
+#   0 (true): If the operation is successful or if the source and
+#       destination are the same file.
+#   1 (false): If the move fails.
+_move_file() {
+    local par_when_conflict=${1:-"skip"}
+    local file_src=$2
+    local file_dst=$3
+
+    # Ensure both source and destination are provided.
+    if [[ -z "$file_src" ]] || [[ -z "$file_dst" ]]; then
+        return 1
+    fi
+
+    # Abort if the source file does not exist.
+    if [[ ! -e "$file_src" ]]; then
+        return 1
+    fi
+
+    # Add the './' prefix in the path.
+    if [[ ! "$file_src" == "/"* ]] &&
+        [[ ! "$file_src" == "./"* ]] && [[ ! "$file_src" == "." ]]; then
+        file_src="./$file_src"
+    fi
+    if [[ ! "$file_dst" == "/"* ]] &&
+        [[ ! "$file_dst" == "./"* ]] && [[ ! "$file_dst" == "." ]]; then
+        file_dst="./$file_dst"
+    fi
+
+    # Skip moving if source and destination are the same file.
+    if [[ "$file_src" == "$file_dst" ]]; then
+        return 0
+    fi
+
+    # Handle conflict behavior when destination already exists.
+    case "$par_when_conflict" in
+    "rename")
+        # Append a numeric suffix to avoid overwriting an existing file.
+        file_dst=$(_get_filename_next_suffix "$file_dst")
+        mv -n -- "$file_src" "$file_dst" 2>/dev/null
+        ;;
+    "skip")
+        # Do not overwrite if destination already exists.
+        mv -n -- "$file_src" "$file_dst" 2>/dev/null
+        ;;
+    "safe_overwrite")
+        # Safely overwrite the destination while preserving attributes and
+        # backups.
+        if [[ -e "$file_dst" ]]; then
+            # Skip empty source files (0 bytes), considered invalid or
+            # incomplete.
+            if [[ ! -s "$file_src" ]]; then
+                return 1
+            fi
+
+            # Skip if both files are identical to avoids unnecessary overwrite.
+            if cmp --silent -- "$file_src" "$file_dst"; then
+                rm -rf -- "$file_src" 2>/dev/null
+                return 1
+            fi
+
+            # Apply the same permissions from the destination to the new file.
+            chmod --reference="$file_dst" -- "$file_src" 2>/dev/null
+
+            # Create a backup of the existing destination file.
+            local file_dst_bak="$file_dst.bak"
+            file_dst_bak=$(_get_filename_next_suffix "$file_dst_bak")
+            mv -n -- "$file_dst" "$file_dst_bak" 2>/dev/null
+        fi
+        # Move the source file to the destination.
+        mv -n -- "$file_src" "$file_dst" 2>/dev/null
+        ;;
+    esac
+
+    if [[ "$par_when_conflict" != "safe_overwrite" ]] &&
+        [[ -e "$file_src" ]]; then
+        local msg=""
+        if [[ -e "$file_dst" ]]; then
+            msg="$(_i18n 'The destination file already exists.')"
+            _log_error "$msg" "$file_src" "" "$file_dst"
+        else
+            msg="$(_i18n 'Unable to move.')"
+            _log_error "$msg" "$file_src" "" "$file_dst"
+        fi
+        return 1
+    fi
+
+    return 0
+}
+
+# Function: _get_working_directory
+#
+# Description:
+#   This function attempts to determine the current working directory based on
+#   the available environment variables or input files.
+_get_working_directory() {
+    local working_dir=""
+
+    # Try to use the information provided by the file manager.
+    local var=""
+    var=$(compgen -v | grep -m1 "_SCRIPT_CURRENT_URI$")
+    if [[ -n "$var" ]]; then
+        eval "working_dir=\$$var"
+    fi
+
+    case "$working_dir" in
+    "file://"*)
+        # If the working directory is a URI, decode it.
+        working_dir=$(_text_uri_decode "$working_dir")
+        ;;
+    *"search://"* | "recent://"* | "trash://"*)
+        # Cases:
+        # - Files selected in the search screen ('x-nautilus-search://');
+        # - Files selected in other screen ('recent://', 'trash://').
+        working_dir=""
+        ;;
+    *"://"*)
+        # Case: Files opened remotely ('sftp://', 'smb://').
+        working_dir=$(_translate_to_gvfs_path "$working_dir")
+        ;;
+    *)
+        # Case: File managers that don't set current directory variables.
+        #
+        # Strategy: Get the directory from first selected item.
+        local item_1=""
+        item_1=$(_get_element "$INPUT_FILES" "1")
+
+        if [[ -n "$item_1" ]]; then
+            # Get the directory name of the first input file.
+            working_dir=$(_get_dirname "$item_1")
+        fi
+        ;;
+    esac
+
+    printf "%s" "$working_dir"
+}
+
+# Function: _is_directory_empty
+#
+# Description:
+#   This function checks if a given directory is empty.
+#
+# Parameters:
+#   $1 (directory): The path of the directory to check.
+#
+# Returns:
+#   0 (true): If the directory is empty.
+#   1 (false): If the directory contains any files or subdirectories.
+_is_directory_empty() {
+    local directory=$1
+
+    if ! find -L "$directory" -mindepth 1 -maxdepth 1 -print -quit |
+        grep --quiet .; then
+        return 0
+    fi
+    return 1
+}
+
+#endregion
+#------------------------------------------------------------------------------
+#region User interface
+#------------------------------------------------------------------------------
+
+# Function: _display_file_selection_box
+#
+# Description:
+#   This function display a GUI dialog box to allow the user to select a file.
+#
+# Parameters:
+#   $1 (title): Optional. Title of the window.
+#   $2 (file_filter): Optional. File filter pattern.
+#   $3 (parameters): A string containing key-value pairs that configure
+#      the function's behavior. Example: 'par_multiple=true'.
+#
+# Options in '$parameters':
+#   - "par_multiple": Enable multiple selection ('true' or 'false').
+#   - "par_directory_only": Enable directory-only ('true' or 'false').
+_display_file_selection_box() {
+    local title=${1:-""}
+    local file_filter=${2:-""}
+    local parameters=${3:-""}
+    local selected_items=""
+    local multiple_flag=""
+    local directory_flag=""
+
+    # Default values for input parameters.
+    local par_multiple="false"
+    local par_directory_only="false"
+
+    # Evaluate the values from the '$parameters' variable.
+    eval "$parameters"
+
+    local btn_ok=""
+    btn_ok="$(_i18n 'OK')"
+    local btn_cancel=""
+    btn_cancel="$(_i18n 'Cancel')"
+
+    # Exit early if not in a GUI session.
+    _is_gui_session || return 0
+
+    [[ -z "$title" ]] && title=$(_get_script_name)
+    [[ "$par_multiple" == "true" ]] && multiple_flag="--multiple"
+    [[ "$par_directory_only" == "true" ]] && directory_flag="--directory"
+
+    _display_lock
+    if _command_exists "zenity"; then
+        selected_items=$(GDK_DEBUG=no-portals zenity --title "$title" \
+            --file-selection $multiple_flag $directory_flag \
+            ${file_filter:+--file-filter="$file_filter"} \
+            --separator="$FIELD_SEPARATOR" 2>/dev/null) || _exit_script
+    elif _command_exists "yad"; then
+        selected_items=$(yad --title "$title" \
+            --button="${btn_cancel}:1" --button="${btn_ok}:0" \
+            --file $multiple_flag $directory_flag \
+            ${file_filter:+--file-filter="$file_filter"} \
+            --separator="$FIELD_SEPARATOR" 2>/dev/null) || _exit_script
+    fi
+    _display_unlock
+
+    selected_items=$(_str_collapse_char "$selected_items" "$FIELD_SEPARATOR")
+    if [[ -z "$selected_items" ]]; then
+        if [[ "$par_directory_only" == "true" ]]; then
+            msg="$(_i18n 'No directories were selected!')"
+        else
+            msg="$(_i18n 'No items were selected!')"
+        fi
+        _display_error_box "$msg"
+        _exit_script
+    fi
+    printf "%s" "$selected_items"
+}
+
+# Function: _display_error_box
+#
+# Description:
+#   This function displays an error message to the user, adapting to the
+#   available environment.
+#
+# Parameters:
+#   $1 (message): The error message to display.
+#   $2 (open_item): Optional. A file or directory to open when the user clicks
+#                   the action button in the notification.
+_display_error_box() {
+    local message=$1
+    local open_item=${2:-}
+
+    local btn_ok=""
+    btn_ok="$(_i18n 'OK')"
+
+    _display_lock
+    if ! _is_gui_session; then
+        # For non-GUI sessions, simply print the message to the console.
+        echo -e "$MSG_ERROR $message" >&2
+    elif [[ -n "$DBUS_SESSION_BUS_ADDRESS" ]]; then
+        _display_gdbus_notify "dialog-error" "$(_get_script_name)" \
+            "$message" "1" "$open_item" "false"
+    elif _command_exists "zenity"; then
+        zenity --title "$(_get_script_name)" \
+            --width="$GUI_INFO_WIDTH" --text="$message" \
+            --ok-label="${btn_ok}" --error &>/dev/null
+    elif _command_exists "yad"; then
+        yad --title "$(_get_script_name)" --center \
+            --width="$GUI_INFO_WIDTH" --text="$message" \
+            --button="${btn_ok}:0" \
+            --image="dialog-error" &>/dev/null
+    elif _command_exists "xmessage"; then
+        xmessage -title "$(_get_script_name)" \
+            -buttons "${btn_ok}:0" \
+            "Error: $message" &>/dev/null
+    fi
+    _display_unlock
+}
+
+# Function: _display_info_box
+#
+# Description:
+#   This function displays an information message to the user, adapting to the
+#   available environment.
+#
+# Parameters:
+#   $1 (message): The information message to display.
+#   $2 (open_item): Optional. A file or directory to open when the user clicks
+#                   the action button in the notification.
+_display_info_box() {
+    local message=$1
+    local open_item=${2:-}
+
+    local btn_ok=""
+    btn_ok="$(_i18n 'OK')"
+
+    _display_lock
+    if ! _is_gui_session; then
+        # For non-GUI sessions, simply print the message to the console.
+        echo -e "$MSG_INFO $message" >&2
+    elif [[ -n "$DBUS_SESSION_BUS_ADDRESS" ]]; then
+        _display_gdbus_notify "dialog-information" "$(_get_script_name)" \
+            "$message" "1" "$open_item" "true"
+    elif _command_exists "zenity"; then
+        zenity --title "$(_get_script_name)" \
+            --width="$GUI_INFO_WIDTH" --text="$message" \
+            --ok-label="${btn_ok}" --info &>/dev/null
+    elif _command_exists "yad"; then
+        yad --title "$(_get_script_name)" --center \
+            --width="$GUI_INFO_WIDTH" --text="$message" \
+            --button="${btn_ok}:0" \
+            --image="dialog-information" &>/dev/null
+    elif _command_exists "xmessage"; then
+        xmessage -title "$(_get_script_name)" \
+            -buttons "${btn_ok}:0" \
+            "Info: $message" &>/dev/null
+    fi
+    _display_unlock
+}
+
+# Function: _display_list_box
+#
+# Description:
+#   This function displays a list box with selectable items, adapting to the
+#   available environment.
+#
+# Parameters:
+#   $1 (list): A string containing the items to display in the list.
+#   $1 (parameters): A string containing key-value pairs that configure
+#      the function's behavior. Example: 'par_item_name=files'.
+#
+# Options in '$parameters':
+#   - "par_columns": Column definitions for the list, typically in the
+#      format "--column:<name>,--column:<name>".
+#   - "par_item_name": A string representing the name of the items in the
+#      list. If not provided, the default value is 'items'.
+#   - "par_action": The action to perform on the selected items.
+#      Supported values:
+#      - "open_file": Opens the selected files with the default application.
+#      - "open_location": Opens the file manager at the location of the
+#        selected items.
+#      - "open_url": Opens the selected URLs in the default web browser.
+#      - "delete_item": Deletes the selected items after user confirmation.
+#   - "par_resolve_links": A boolean-like string ('true' or 'false')
+#     indicating whether symbolic links in item paths should be resolved to
+#     their target locations when opening the item's location. Defaults to
+#     'true'.
+#   - "par_check_type": Defines the type of selectable field added to item.
+#      Supported values:
+#      - "checkbox": Adds a checkbox column.
+#      - "radiolist": Adds a radio button column.
+#      - "none": No selection field is added (default).
+#   - "par_check_select": Defines which items should start selected when a
+#      check type is enabled. Supported values:
+#      - "all": All items are marked as selected.
+#      - "first": Only the first item is selected.
+#      - "first_if_one": Only the first item is selected if there is one item.
+#      - "none": No items start selected.
+_display_list_box() {
+    local list=$1
+    local parameters=$2
+
+    # Default values for input parameters.
+    local par_columns=""
+    local par_item_name=""
+    local par_action=""
+    local par_resolve_links="true"
+    local par_check_type="none"
+    local par_check_select="none"
+    par_item_name=$(_i18n 'items')
+
+    # Evaluate the values from the '$parameters' variable.
+    eval "$parameters"
+
+    _close_wait_box
+    _logs_consolidate ""
+
+    if ! _is_gui_session; then
+        _display_list_box_terminal "$list"
+    elif _command_exists "zenity" || _command_exists "yad"; then
+        _display_select_box_action "$list" \
+            "$par_columns" "$par_check_type" "$par_check_select" \
+            "$par_item_name" "$par_action" "$par_resolve_links"
+    elif _command_exists "xmessage"; then
+        _display_list_box_xmessage "$list" "$par_columns"
+    fi
+}
+
+_display_list_box_terminal() {
+    local list=$1
+
+    if [[ -z "$list" ]]; then
+        list="$(_i18n '(Empty)')"
+        printf "%s\n" "$list" >&2
+    else
+        list=$(tr "$FIELD_SEPARATOR" " " <<<"$list")
+        printf "%s\n" "$list"
+    fi
+}
+
+_display_select_box_action() {
+    local list=$1
+    local par_columns=$2
+    local par_check_type=$3
+    local par_check_select=$4
+    local par_item_name=$5
+    local par_action=$6
+    local par_resolve_links=$7
+    local columns_count=0
+    local items_count=0
+    local selected_items=""
+    local header_label=""
+
+    if [[ -n "$list" ]]; then
+        items_count=$(tr -cd "\n" <<<"$list" | wc -c)
+    fi
+
+    local total_msg=""
+    total_msg="$(_i18n 'Total:')"
+
+    # Set the selection list based on the action and item count.
+    if ((items_count > 0)); then
+        local msg=""
+        case "$par_action" in
+        "open_file")
+            msg="$(_i18n 'Select the ones to open:')"
+            ;;
+        "open_location")
+            msg="$(_i18n 'Select the ones to show in the file manager:')"
+            ;;
+        "open_url")
+            msg="$(_i18n 'Select the ones to open in the web browser:')"
+            ;;
+        "delete_item")
+            msg="$(_i18n 'Select the ones to delete:')"
+            ;;
+        esac
+        header_label="$total_msg $items_count $par_item_name. $msg"
+    else
+        header_label="$total_msg $items_count $par_item_name."
+    fi
+
+    selected_items=$(_display_select_box "$list" "$par_columns" \
+        "$par_check_type" "$par_check_select" "$header_label")
+
+    # Open the selected items.
+    if ((items_count > 0)) && [[ -n "$selected_items" ]]; then
+        case "$par_action" in
+        "open_file") xdg-open "$selected_items" &>/dev/null & ;;
+        "open_location")
+            _open_items_locations "$selected_items" "$par_resolve_links"
+            ;;
+        "open_url") _open_urls "$selected_items" ;;
+        "delete_item") _delete_items "$selected_items" ;;
+        esac
+    fi
+}
+
+_display_select_box() {
+    local list=$1
+    local par_columns=$2
+    local par_check_type=$3
+    local par_check_select=$4
+    local header_label=$5
+
+    if [[ -z "$par_columns" ]]; then
+        par_columns="--column="
+    fi
+
+    case "$par_check_type" in
+    "checkbox")
+        par_columns="--column=$FIELD_SEPARATOR$par_columns"
+        par_columns="--checklist$FIELD_SEPARATOR$par_columns"
+        ;;
+    "radiolist")
+        par_columns="--column=$FIELD_SEPARATOR$par_columns"
+        par_columns="--radiolist$FIELD_SEPARATOR$par_columns"
+        ;;
+    esac
+
+    if [[ -n "$par_columns" ]]; then
+        par_columns=$(tr ":" "=" <<<"$par_columns")
+        columns_count=$(grep --only-matching "column=" <<<"$par_columns" |
+            wc -l)
+    fi
+
+    if [[ -z "$list" ]]; then
+        # NOTE: Some Zenity versions crash  with
+        # an empty list (Segmentation fault).
+        list=" "
+    else
+        items_count=$(tr -cd "\n" <<<"$list" | wc -c)
+    fi
+
+    # Set the selection.
+    if ((items_count > 0)) && [[ "$par_check_type" != "none" ]]; then
+        case "${par_check_select,,}" in
+        "all")
+            list=$(sed "s|^\(.*\)$|TRUE$FIELD_SEPARATOR\1|" <<<"$list")
+            ;;
+        "first")
+            list=$(sed "1s|^\(.*\)$|TRUE$FIELD_SEPARATOR\1|" <<<"$list")
+            list=$(sed "1!s|^\(.*\)$|FALSE$FIELD_SEPARATOR\1|" <<<"$list")
+            ;;
+        "first_if_one")
+            if ((items_count == 1)); then
+                list=$(sed "1s|^\(.*\)$|TRUE$FIELD_SEPARATOR\1|" <<<"$list")
+            else
+                list=$(sed "s|^\(.*\)$|FALSE$FIELD_SEPARATOR\1|" <<<"$list")
+            fi
+            ;;
+        *)
+            list=$(sed "s|^\(.*\)$|FALSE$FIELD_SEPARATOR\1|" <<<"$list")
+            ;;
+        esac
+    fi
+
+    par_columns=$(tr "," "$FIELD_SEPARATOR" <<<"$par_columns")
+    list=$(tr "\n" "$FIELD_SEPARATOR" <<<"$list")
+
+    # Avoid empty fields.
+    local fs=$FIELD_SEPARATOR
+    list=$(sed ":again; s/$fs$fs/$fs $fs/g; t again" <<<"$list")
+
+    # Avoid leading '-' in the variable to use in command line.
+    list=$(sed "s|$FIELD_SEPARATOR-|$FIELD_SEPARATOR|g" <<<"$list")
+
+    # Get the system limit for arguments.
+    local arg_max=""
+    local msg_size=""
+    local safet_margin=65536 # Reserve space for extra args.
+    arg_max=$(getconf "ARG_MAX")
+    msg_size=$(printf "%s" "$list" | wc -c)
+
+    local btn_ok=""
+    btn_ok="$(_i18n 'OK')"
+    local btn_cancel=""
+    btn_cancel="$(_i18n 'Cancel')"
+
+    _display_lock
+    if ((msg_size > arg_max - safet_margin)); then
+        list=$(tr "$FIELD_SEPARATOR" "\n" <<<"$list")
+
+        # HACK: Workaround for '--list'. Use stdin instead of passing
+        # arguments directly. This avoids the "Argument list too long"
+        # error when '$list' is too large.
+        # See: https://gitlab.gnome.org/GNOME/zenity/-/issues/117
+        if _command_exists "zenity"; then
+            # shellcheck disable=SC2086
+            selected_items=$(zenity --title "$(_get_script_name)" --list \
+                --multiple --no-markup --separator="$FIELD_SEPARATOR" \
+                --width="$GUI_BOX_WIDTH" --height="$GUI_BOX_HEIGHT" \
+                --print-column "$columns_count" --text "$header_label" \
+                --cancel-label="${btn_cancel}" --ok-label="${btn_ok}" \
+                $par_columns <<<"$list" 2>/dev/null) || _exit_script
+        else
+            printf "%s" "$list" >"$TEMP_DIR/list.txt"
+            # shellcheck disable=SC2086
+            selected_items=$(yad --title "$(_get_script_name)" --list \
+                --multiple --no-markup --separator="$FIELD_SEPARATOR" \
+                --width="$GUI_BOX_WIDTH" --height="$GUI_BOX_HEIGHT" \
+                --print-column "$columns_count" --text "$header_label" \
+                --button="${btn_cancel}:1" --button="${btn_ok}:0" \
+                --rest="$TEMP_DIR/list.txt" \
+                $par_columns 2>/dev/null) || _exit_script
+        fi
+
+    else
+        # Default strategy for '--list'. Pass '$list' directly as
+        # arguments. This strategy is very fast.
+        if _command_exists "zenity"; then
+            # shellcheck disable=SC2086
+            selected_items=$(zenity --title "$(_get_script_name)" --list \
+                --multiple --no-markup --separator="$FIELD_SEPARATOR" \
+                --width="$GUI_BOX_WIDTH" --height="$GUI_BOX_HEIGHT" \
+                --print-column "$columns_count" --text "$header_label" \
+                --cancel-label="${btn_cancel}" --ok-label="${btn_ok}" \
+                $par_columns $list 2>/dev/null) || _exit_script
+        else
+            # shellcheck disable=SC2086
+            selected_items=$(yad --title "$(_get_script_name)" --list \
+                --multiple --no-markup --separator="$FIELD_SEPARATOR" \
+                --width="$GUI_BOX_WIDTH" --height="$GUI_BOX_HEIGHT" \
+                --print-column "$columns_count" --text "$header_label" \
+                --button="${btn_cancel}:1" --button="${btn_ok}:0" \
+                $par_columns $list 2>/dev/null) || _exit_script
+        fi
+    fi
+    _display_unlock
+
+    # HACK: Workaround for YAD.
+    # Its output appends an extra field separator at the end.
+    # See: https://github.com/v1cont/yad/issues/307
+    if ! _command_exists "zenity"; then
+        selected_items=$(tr "\n" "$FIELD_SEPARATOR" <<<"$selected_items")
+        selected_items=$(_str_collapse_char \
+            "$selected_items" "$FIELD_SEPARATOR")
+    fi
+    printf "%s" "$selected_items"
+}
+
+_display_list_box_xmessage() {
+    local list=$1
+    local par_columns=$2
+
+    local btn_ok=""
+    btn_ok="$(_i18n 'OK')"
+
+    par_columns=$(sed "s|--column:||g" <<<"$par_columns")
+    par_columns=$(tr "," "\t" <<<"$par_columns")
+    list=$(tr "$FIELD_SEPARATOR" "\t" <<<"$list")
+    list="$par_columns"$'\n'$'\n'"$list"
+
+    _display_lock
+    printf "%s" "$list" >"$TEMP_DATA_TEXT_BOX"
+    xmessage -title "$(_get_script_name)" \
+        -buttons "${btn_ok}:0" \
+        -file "$TEMP_DATA_TEXT_BOX" \
+        &>/dev/null || _exit_script
+    _display_unlock
+}
+
+# Function: _display_input_text_box
+#
+# Description:
+#   This function displays an input text dialog (GUI or terminal) to request a
+#   text value from the user.
+#
+# Parameters:
+#   $1 (message): The message or prompt to display to the user.
+#   $2 (default_value): Optional. Default text to prefill the input field.
+_display_input_text_box() {
+    local message=$1
+    local default_value=${2:-""}
+    local input=""
+
+    local btn_ok=""
+    btn_ok="$(_i18n 'OK')"
+    local btn_cancel=""
+    btn_cancel="$(_i18n 'Cancel')"
+
+    _display_lock
+    # Ask the user for the input.
+    if ! _is_gui_session; then
+        echo -e -n "$MSG_INFO $message " >&2
+        read -r input </dev/tty
+        echo >&2
+    elif _command_exists "zenity"; then
+        input=$(zenity --title="$(_get_script_name)" \
+            --width="$GUI_INFO_WIDTH" --text="$message" \
+            --cancel-label="${btn_cancel}" --ok-label="${btn_ok}" \
+            --entry ${default_value:+--entry-text="$default_value"} \
+            2>/dev/null) || _exit_script
+    elif _command_exists "yad"; then
+        input=$(yad --title="$(_get_script_name)" --center \
+            --width="$GUI_INFO_WIDTH" --text="$message" \
+            --button="${btn_cancel}:1" --button="${btn_ok}:0" \
+            --entry ${default_value:+--entry-text="$default_value"} \
+            2>/dev/null) || _exit_script
+    fi
+    _display_unlock
+
+    printf "%s" "$input"
+}
+
+# Function: _display_password_box
+#
+# Description:
+#   This function prompts the user to enter a password, either via the terminal
+#   or a graphical dialog box.
+#
+# Parameters:
+#   $1 (message): A message to display as a prompt for the password.
+#
+# Returns:
+#   0 (true): If the password is successfully obtained.
+#   1 (false): If the user cancels the input or an error occurs.
+_display_password_box() {
+    local message=$1
+    local password=""
+
+    local title=""
+    title="$(_i18n 'Password')"
+    local btn_ok=""
+    btn_ok="$(_i18n 'OK')"
+    local btn_cancel=""
+    btn_cancel="$(_i18n 'Cancel')"
+
+    _display_lock
+    # Ask the user for the password.
+    if ! _is_gui_session; then
+        echo -e -n "$MSG_INFO $message " >&2
+        read -r -s password </dev/tty
+        echo >&2
+    elif _command_exists "zenity"; then
+        password=$(zenity --title="$title" \
+            --width="$GUI_INFO_WIDTH" --text="$message" \
+            --cancel-label="${btn_cancel}" --ok-label="${btn_ok}" \
+            --entry --hide-text 2>/dev/null) || return 1
+    elif _command_exists "yad"; then
+        password=$(yad --title="$title" --center \
+            --width="$GUI_INFO_WIDTH" --text="$message" \
+            --button="${btn_cancel}:1" --button="${btn_ok}:0" \
+            --entry --hide-text 2>/dev/null) || return 1
+    fi
+    _display_unlock
+
+    printf "%s" "$password"
+}
+
+# Function: _display_password_box_define
+#
+# Description:
+#   This function prompts the user to enter a password and checks if the
+#   password is not empty.
+#
+# Returns:
+#   0 (true): If the password is successfully obtained.
+#   1 (false): If the user cancels the input or an error occurs.
+_display_password_box_define() {
+    local password=""
+    local msg=""
+
+    msg="$(_i18n 'Type your password:')"
+    password=$(_display_password_box "$msg") || return 1
+
+    # Check if '$password' is not empty.
+    if [[ -z "$password" ]]; then
+        msg="$(_i18n 'The password can not be empty!')"
+        _display_error_box "$msg"
+        return 1
+    fi
+
+    printf "%s" "$password"
+}
+
+# Function: _display_question_box
+#
+# Description:
+#   This function prompts the user with a yes/no question and returns the
+#   user's response.
+#
+# Parameters:
+#   $1 (message): The question message to display to the user.
+#
+# Returns:
+#   0 (true): If the user responds with 'yes' or 'y'.
+#   1 (false): If the user responds with 'no' or 'n', or if an error.
+_display_question_box() {
+    local message=$1
+    local response=""
+
+    local btn_yes=""
+    btn_yes="$(_i18n 'Yes')"
+    local btn_no=""
+    btn_no="$(_i18n 'No')"
+
+    _display_lock
+    if ! _is_gui_session; then
+        if [[ "${DEBUG:-}" != "true" ]]; then
+            echo -e -n "$message [Y/n] " >&2
+            read -r response </dev/tty
+            echo >&2
+        fi
+        [[ ${response,,} == *"n"* ]] && return 1
+    elif _command_exists "zenity"; then
+        zenity --title "$(_get_script_name)" \
+            --width="$GUI_INFO_WIDTH" --text="$message" \
+            --cancel-label="${btn_no}" --ok-label="${btn_yes}" \
+            --question &>/dev/null || return 1
+    elif _command_exists "yad"; then
+        yad --title "$(_get_script_name)" --center \
+            --width="$GUI_INFO_WIDTH" --text="$message" \
+            --button="${btn_no}:1" --button="${btn_yes}:0" \
+            --image="dialog-question" &>/dev/null || return 1
+    elif _command_exists "xmessage"; then
+        xmessage -title "$(_get_script_name)" \
+            -buttons "${btn_no}:1,${btn_yes}:0" \
+            "$message" &>/dev/null || return 1
+    fi
+    _display_unlock
+
+    return 0
+}
+
+# Function: _display_text_box
+#
+# Description:
+#   This function displays a message to the user in a text box, either in the
+#   terminal or using a GUI dialog.
+#
+# Parameters:
+#   $1 (message): The message to display.
+_display_text_box() {
+    local message=$1
+
+    _close_wait_box
+    _logs_consolidate ""
+
+    if [[ -z "$message" ]]; then
+        message="$(_i18n '(Empty)')"
+    fi
+    message+=$'\n'
+
+    local btn_ok=""
+    btn_ok="$(_i18n 'OK')"
+    local btn_cancel=""
+    btn_cancel="$(_i18n 'Cancel')"
+
+    _display_lock
+    if ! _is_gui_session; then
+        printf "%s\n" "$message"
+    elif _command_exists "zenity"; then
+        printf "%s" "$message" >"$TEMP_DATA_TEXT_BOX"
+        zenity --title "$(_get_script_name)" \
+            --no-markup --width="$GUI_BOX_WIDTH" --height="$GUI_BOX_HEIGHT" \
+            --cancel-label="${btn_cancel}" --ok-label="${btn_ok}" \
+            --text-info --no-wrap \
+            --filename="$TEMP_DATA_TEXT_BOX" &>/dev/null || _exit_script
+    elif _command_exists "yad"; then
+        printf "%s" "$message" >"$TEMP_DATA_TEXT_BOX"
+        yad --title "$(_get_script_name)" --center \
+            --no-markup --width="$GUI_BOX_WIDTH" --height="$GUI_BOX_HEIGHT" \
+            --button="${btn_cancel}:1" --button="${btn_ok}:0" \
+            --text-info --no-wrap \
+            --filename="$TEMP_DATA_TEXT_BOX" &>/dev/null || _exit_script
+    elif _command_exists "xmessage"; then
+        printf "%s" "$message" >"$TEMP_DATA_TEXT_BOX"
+        xmessage -title "$(_get_script_name)" \
+            -buttons "${btn_ok}:0" \
+            -file "$TEMP_DATA_TEXT_BOX" &>/dev/null || _exit_script
+    fi
+    _display_unlock
+}
+
+# Function: _display_result_box
+#
+# Description:
+#   This function displays a result summary at the end of a process, including
+#   error checking and output directory information.
+#
+# Parameters:
+#   $1 (output_dir): The directory where output files are stored or
+#      expected to be.
+_display_result_box() {
+    local output_dir=$1
+    local msg=""
+
+    _close_wait_box
+    _logs_consolidate "$output_dir"
+
+    # If '$output_dir' parameter is defined.
+    if [[ -n "$output_dir" ]]; then
+        # Try to remove the output directory (if it is empty).
+        if [[ "$output_dir" == *"/$PREFIX_OUTPUT_DIR"* ]]; then
+            rmdir "$output_dir" &>/dev/null
+        fi
+
+        # Check if the output directory still exists.
+        if [[ -d "$output_dir" ]]; then
+            local dir_label=""
+            dir_label=$(_str_human_readable_path "$output_dir")
+            msg="$(_i18n 'Finished! The output files are in:')"
+            _display_info_box "$msg $dir_label" "$output_dir"
+        else
+            msg="$(_i18n 'Finished, but there is nothing to do.')"
+            _display_info_box "$msg"
+        fi
+    else
+        msg="$(_i18n 'Finished!')"
+        _display_info_box "$msg"
+    fi
+}
+
+# Function: _display_wait_box
+#
+# Description:
+#   This function displays a wait box to inform the user that a task is running
+#   and they need to wait.
+#
+# Parameters:
+#   $1 (open_delay): Optional. The delay (in seconds) before the wait box
+#      is shown. Defaults to 2 seconds if not provided.
+_display_wait_box() {
+    local open_delay=${1:-"2"}
+    local msg=""
+    msg="$(_i18n 'Running the task. Please, wait...')"
+
+    _display_wait_box_message "$msg" "$open_delay"
+}
+
+# Function: _display_wait_box_message
+#
+# Description:
+#   This function displays a wait box (progress indicator) to inform the user
+#   that a task is in progress.
+#
+# Parameters:
+#   $1 (message): The message to display inside the wait box (e.g.,
+#      "Running the task. Please, wait...").
+#   $2 (open_delay): Optional. The delay (in seconds) before the wait box
+#      is shown. Defaults to 2 seconds if not provided.
+_display_wait_box_message() {
+    local message=$1
+    local open_delay=${2:-"1.5"}
+
+    # Avoid open more than one 'wait box'.
+    [[ -f "$TEMP_CONTROL_WAIT_BOX_DELAY" ]] && return 0
+
+    if ! _is_gui_session; then
+        # For non-GUI sessions, simply print the message to the console.
+        echo -e "$MSG_INFO $message" >&2
+
+    # Check if the Zenity is available.
+    elif _command_exists "zenity" || _command_exists "yad"; then
+        # Control flag to inform that a 'wait box' will open
+        # (if the task takes over 2 seconds).
+        touch -- "$TEMP_CONTROL_WAIT_BOX_DELAY"
+
+        # Create the FIFO for communication with Zenity 'wait box'.
+        if [[ ! -p "$TEMP_CONTROL_WAIT_BOX_FIFO" ]]; then
+            mkfifo "$TEMP_CONTROL_WAIT_BOX_FIFO"
+            if ! _command_exists "zenity"; then
+                # HACK: Workaround for YAD.
+                # Removes the progress label and sets the progress bar to 90%.
+                # See: https://github.com/v1cont/yad/issues/305
+                printf "#\n90\n" >"$TEMP_CONTROL_WAIT_BOX_FIFO" &
+            fi
+        fi
+
+        local btn_cancel=""
+        btn_cancel="$(_i18n 'Cancel')"
+
+        # Launch a background thread for Zenity 'wait box':
+        #   - Waits for the defined delay.
+        #   - Opens the Zenity 'wait box' if the control flag still exists.
+        #   - If Zenity 'wait box' fails or is cancelled, exit the script.
+        # shellcheck disable=SC2002
+        (
+            # Wait for a possible previous window to finish opening.
+            sleep 0.5
+
+            # Monitor lock file until the window closes.
+            while [[ -f "$TEMP_CONTROL_DISPLAY_LOCKED" ]]; do
+                # Small delay to prevent high CPU usage.
+                sleep 0.5
+            done
+
+            # Delay before showing the 'wait_box'.
+            sleep "$open_delay"
+
+            # Check if the task has already finished.
+            [[ ! -d "$TEMP_DIR" ]] && return 0
+
+            # Check if the 'wait box' should open.
+            [[ ! -f "$TEMP_CONTROL_WAIT_BOX_DELAY" ]] && return 0
+
+            _display_lock
+            if _command_exists "zenity"; then
+                tail -f -- "$TEMP_CONTROL_WAIT_BOX_FIFO" | (zenity \
+                    --title="$(_get_script_name)" \
+                    --width="$GUI_INFO_WIDTH" --cancel-label="${btn_cancel}" \
+                    --progress --auto-close --pulsate \
+                    --text="$message" || _exit_script)
+            else
+                tail -f -- "$TEMP_CONTROL_WAIT_BOX_FIFO" | (yad \
+                    --title="$(_get_script_name)" --center \
+                    --width="$GUI_INFO_WIDTH" \
+                    --progress --auto-close --button="${btn_cancel}:1" \
+                    --text="$message" || _exit_script)
+            fi
+            _display_unlock
+        ) &
+    fi
+}
+
+# Function: _close_wait_box
+#
+# Description:
+#   This function is responsible for closing any open 'wait box' (progress
+#   indicators) that were displayed during the execution of a task.
+_close_wait_box() {
+    # Cancel the future open of any 'wait box'.
+    rm -f -- "$TEMP_CONTROL_WAIT_BOX_DELAY"
+    _display_unlock
+
+    # Check if Zenity 'wait box' is open, (waiting for an input in the FIFO).
+    if pgrep -fl "$TEMP_CONTROL_WAIT_BOX_FIFO" &>/dev/null; then
+        # Close the Zenity using the FIFO.
+        printf "100\n" >"$TEMP_CONTROL_WAIT_BOX_FIFO"
+    fi
+}
+
+# Function: _display_lock
+#
+# Description:
+#   This function creates a temporary lock file used to indicate that the wait
+#   box should not be opened at this time. In this case, '_display_wait_box'
+#   will wait until '_display_unlock' is executed.
+_display_lock() {
+    touch -- "$TEMP_CONTROL_DISPLAY_LOCKED"
+}
+
+# Function: _display_unlock
+#
+# Description:
+#   This function removes the temporary lock file created by '_display_lock'.
+#   By doing so, it signals that the wait box can now be displayed.
+_display_unlock() {
+    rm -f -- "$TEMP_CONTROL_DISPLAY_LOCKED"
+}
+
+# Function: _display_gdbus_notify
+#
+# Description:
+#   This function sends a desktop notification using the 'gdbus' tool, which
+#   interfaces with the D-Bus notification system (specifically the
+#   'org.freedesktop.Notifications' service).
+#
+# Parameters:
+#   $1 (icon): The icon to display with the notification.
+#   $2 (title): The title of the notification.
+#   $3 (body): The main message to be displayed in the notification.
+#   $4 (urgency): Optional. The urgency level of the notification.
+#                 0 = low
+#                 1 = normal (default)
+#                 2 = critical
+#   $5 (open_item): Optional. A file or directory to open when the user clicks
+#                   the action button in the notification.
+#   $6 (transient): Optional. A boolean-like string ('true' or 'false')
+#                   indicating whether the notification should be transient.
+#                   Defaults to 'false'.
+_display_gdbus_notify() {
+    local icon=$1
+    local title=$2
+    local body=$3
+    local urgency=${4:-1}
+    local open_item=${5:-}
+    local transient=${6:-"false"}
+    local app_name=$title
+    local method="Notify"
+    local interface="org.freedesktop.Notifications"
+    local object_path="/org/freedesktop/Notifications"
+
+    # Use 'gdbus' to send the notification.
+    if [[ -z "$open_item" ]] || _is_qt_desktop; then
+        # Display a simple notification without action.
+        gdbus call --session --dest "$interface" \
+            --object-path "$object_path" \
+            --method "$interface.$method" \
+            "$app_name" 0 "$icon" "$title" "$body" \
+            "[]" \
+            "{'transient': <$transient>, 'urgency': <$urgency>}" \
+            5000 &>/dev/null
+    else
+        local action_id=""
+        action_id="__CMD_OpenDir__${$}"
+        local msg=""
+        msg="$(_i18n 'Open')"
+
+        # Display the notification with an action button.
+        gdbus call --session --dest "$interface" \
+            --object-path "$object_path" \
+            --method "$interface.$method" \
+            "$app_name" 0 "$icon" "$title" "$body" \
+            "['$action_id', '$msg']" \
+            "{'transient': <$transient>, 'urgency': <$urgency>}" \
+            5000 &>/dev/null
+
+        # Monitor for the action invoked by the user.
+        local line=""
+        timeout 10s \
+            dbus-monitor "interface='$interface',member='ActionInvoked'" |
+            while read -r line; do
+                if [[ "$line" == *"$action_id"* ]]; then
+                    xdg-open "$open_item" &>/dev/null &
+                    _exit_script
+                fi
+            done
+    fi
+}
+
+#endregion
+#------------------------------------------------------------------------------
+#region System and environment
+#------------------------------------------------------------------------------
+
+# Function: _get_available_app
+#
+# Description:
+#   This function iterates through a list of applications and returns the first
+#   one that is available. It relies on the helper function '_command_exists'
+#   to check for the existence of each command.
+#
+# Parameters:
+#   $1 (_apps): An array of application names to check, in order of
+#      preference.
+#
+# Returns:
+#   0 (true): If an available application is found, prints its name.
+#   1 (false): If no applications from the list are found.
+_get_available_app() {
+    local -n _apps=$1
+
+    local app=""
+    for app in "${_apps[@]}"; do
+        if _command_exists "$app"; then
+            printf "%s" "$app"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+# Function: _get_available_file_manager
+#
+# Description:
+#   This function detects the default or an available file manager on the
+#   system.
+#
+# Returns:
+#   0 (true): If a file manager is found, prints its name.
+#   1 (false): If no file manager is found.
+_get_available_file_manager() {
+    local available_app=""
+    local default_app=""
+    default_app=$(_xdg_get_default_app "inode/directory" "true")
+
+    local apps=(
+        "nautilus"
+        "dolphin"
+        "nemo"
+        "caja"
+        "thunar"
+        "pcmanfm-qt"
+        "pcmanfm"
+    )
+
+    # Step 1: Validate if the detected default application matches one of the
+    # known file managers.
+    local app=""
+    for app in "${apps[@]}"; do
+        if [[ "$default_app" == *"$app" ]]; then
+            printf "%s" "$app"
+            return 0
+        fi
+    done
+
+    # Step 2: If no valid default found, check which file managers from the
+    # list are installed on the system and return the first match.
+    available_app=$(_get_available_app "apps")
+    if [[ -n "$available_app" ]]; then
+        printf "%s" "$available_app"
+        return 0
+    fi
+
+    # Step 3: If 'xdg-mime' returned something but it's not in the predefined
+    # list, return it anyway as a last attempt.
+    if [[ -n "$default_app" ]]; then
+        printf "%s" "$default_app"
+        return 0
+    fi
+
+    # Step 4: No file manager found. return error code 1.
+    return 1
+}
+
+# Function: _get_script_name
+#
+# Description:
+#   This function returns the name of the executing script. It uses the
+#   'basename' command to extract the script's filename from the full path
+#   provided by '$0'.
+_get_script_name() {
+    local script_name=""
+    script_name=$(basename -- "$0")
+
+    # Remove 'dd ' (two digits + space) at the beginning.
+    script_name=$(sed "s|^[0-9]\{2\} ||" <<<"$script_name")
+    _i18n "$script_name"
+}
+
+# Function: _is_file_manager_session
+#
+# Description:
+#   This function checks whether the script is being executed from within a
+#   file manager action specifically in GNOME Files (Nautilus), Nemo, or Caja.
+#   The detection is done by checking if any environment variable matches the
+#   pattern "_SCRIPT_SELECTED_URIS", which is set by these file managers when
+#   running user-defined scripts.
+#
+# Returns:
+#   0 (true): If running inside a file manager session.
+#   1 (false): If not running inside one of these file managers.
+_is_file_manager_session() {
+    compgen -v | grep --quiet -m1 "_SCRIPT_SELECTED_URIS$"
+}
+
+# Function: _is_gui_session
+#
+# Description:
+#   This function checks whether the script is running in a graphical user
+#   interface (GUI) session. It does so by checking if the 'DISPLAY'
+#   environment variable is set, which is typically present in GUI sessions.
+#
+# Returns:
+#   0 (true): If is a GUI session.
+#   1 (false): If is not a GUI session.
+_is_gui_session() {
+    if [[ -n "${DISPLAY:-}" ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# Function: _is_qt_desktop
+#
+# Description:
+#   This function determines whether the current desktop environment (as
+#   defined by the XDG_CURRENT_DESKTOP variable) is Qt-based.
+#
+# Returns:
+#   0 (true): If the desktop is Qt-based.
+#   1 (false): Otherwise.
+_is_qt_desktop() {
+    local qt_desktops=("kde" "lxqt" "tde" "trinity" "razor" "lumina")
+    local current_desktop=""
+
+    if [[ -z "${XDG_CURRENT_DESKTOP:-}" ]]; then
+        return 1
+    fi
+
+    current_desktop=${XDG_CURRENT_DESKTOP,,}
+
+    local qt_desktop=""
+    for qt_desktop in "${qt_desktops[@]}"; do
+        if [[ "$current_desktop" == *"$qt_desktop"* ]]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+# Function: _get_max_procs
+#
+# Description:
+#   This function returns the maximum number of processing units (CPU cores)
+#   available on the system.
+_get_max_procs() {
+    nproc --all 2>/dev/null
+}
+
+# Function: _unset_global_variables_file_manager
+#
+# Description:
+#   This function unset global variables that may have been set by different
+#   file managers (Nautilus, Nemo, Caja) during script execution.
+_unset_global_variables_file_manager() {
+    local var=""
+    while IFS= read -r var; do
+        unset "$var"
+    done < <(compgen -v | grep "_SCRIPT_")
+}
+
+# Function: _xdg_get_default_app
+#
+# Description:
+#   This function retrieves the default application associated with a specific
+#   MIME type using the 'xdg-mime' command.
+#
+# Parameters:
+#   $1 (mime): MIME type (e.g., 'application/pdf', 'image/png').
+#   $2 (quiet): Optional. If set to 'true', the function will return 1 on
+#      errors without displaying any dialog or exiting. Default is 'false'.
+#
+# Returns:
+#   0 (true): If the default application is found, prints its executable.
+#   1 (false): If no default application is set or found.
+_xdg_get_default_app() {
+    local mime=$1
+    local quiet=${2:-"false"}
+    local desktop_file=""
+    local desktop_path=""
+    local default_app=""
+    local msg=""
+
+    # Get '.desktop' file from xdg-mime.
+    desktop_file=$(xdg-mime query default "$mime" 2>/dev/null)
+    if [[ -z "$desktop_file" ]]; then
+        if [[ "$quiet" == "true" ]]; then
+            return 1
+        fi
+        msg="$(_i18n 'No default application is set for the type:')"
+        _display_error_box "$msg '$mime'!"
+        _exit_script
+    fi
+
+    # Get standard XDG application directories.
+    local xdg_dirs="${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+    if [[ -n "${HOME:-}" ]]; then
+        xdg_dirs+=":$HOME/.local/share"
+    fi
+
+    # Append the directory 'applications'.
+    xdg_dirs=$(sed "s|/:|:|g; s|:|/applications:|g; s|/$||" <<<"$xdg_dirs")
+    xdg_dirs+="/applications"
+
+    # Locate the '.desktop' file.
+    xdg_dirs=$(tr ":" "$FIELD_SEPARATOR" <<<"$xdg_dirs")
+    local xdg_dir=""
+    for xdg_dir in $xdg_dirs; do
+        desktop_path="$xdg_dir/$desktop_file"
+        if [[ -f "$desktop_path" ]]; then
+            # Extract Exec line, normalize to get only the binary.
+            default_app=$(grep -m1 "^Exec=" "$desktop_path" |
+                sed "s|Exec=||" | cut -d " " -f 1)
+
+            if _command_exists "$default_app"; then
+                break
+            else
+                default_app=""
+            fi
+        fi
+    done
+
+    if [[ -z "$default_app" ]]; then
+        if [[ "$quiet" == "true" ]]; then
+            return 1
+        fi
+        msg="$(_i18n 'Could not find the executable to open MIME type:')"
+        _display_error_box "$msg '$mime'!"
+        _exit_script
+    fi
+
+    printf "%s" "$default_app"
+}
+
+#endregion
+#------------------------------------------------------------------------------
+#region Clipboard management
+#------------------------------------------------------------------------------
+
+# Function: _get_clipboard_data
+#
+# Description:
+#   This function retrieves the current content of the clipboard, adapting the
+#   method according to the session type.
+_get_clipboard_data() {
+    case "${XDG_SESSION_TYPE:-}" in
+    "wayland") wl-paste 2>/dev/null ;;
+    "x11") xclip -quiet -selection clipboard -o 2>/dev/null ;;
+    esac
+}
+
+# Function: _set_clipboard_data
+#
+# Description:
+#   This function sets the content of the clipboard with the provided input
+#   data, adapting the method according to the session type.
+#
+# Parameters:
+#   $1 (data): The text string to be copied into the clipboard.
+_set_clipboard_data() {
+    local data=$1
+
+    case "${XDG_SESSION_TYPE:-}" in
+    "wayland") printf "%s" "$data" | wl-copy 2>/dev/null ;;
+    "x11") printf "%s" "$data" | xclip -selection clipboard -i 2>/dev/null ;;
+    esac
+}
+
+# Function: _set_clipboard_file
+#
+# Description:
+#   This function sets the content of the clipboard with the provided input
+#   file, adapting the method according to the session type.
+#
+# Parameters:
+#   $1 (input_file): The file to be copied into the clipboard.
+_set_clipboard_file() {
+    local input_file=$1
+
+    case "${XDG_SESSION_TYPE:-}" in
+    "wayland") wl-copy <"$input_file" 2>/dev/null ;;
+    "x11") xclip -selection clipboard -i <"$input_file" 2>/dev/null ;;
+    esac
+}
+
+#endregion
+#------------------------------------------------------------------------------
+#region Input files
+#------------------------------------------------------------------------------
+
+# Function: _translate_to_gvfs_path
+#
+# Description:
+#   This function converts a remote URI into the corresponding GVfs-mounted
+#   path under '/run/user/<uid>/gvfs/'.
+_translate_to_gvfs_path() {
+    local uri=$1
+    local uid=""
+    local gvfs_base=""
+    local scheme=""
+    local host=""
+    local host_path=""
+    local path=""
+    local gvfs_path=""
+    local share=""
+    local rest=""
+
+    # Base GVfs mount path.
+    uid=$(id -u)
+    gvfs_base="/run/user/${uid}/gvfs"
+
+    # Extract scheme (e.g. sftp, smb)
+    scheme="${uri%%://*}"
+    host_path="${uri#*://}"
+
+    # Extract host and path
+    host="${host_path%%/*}"
+    path="${host_path#*/}"
+
+    # Special handling for SMB (different GVfs mount naming).
+    if [[ "$scheme" == "smb" ]]; then
+        # SMB URIs have "server/share/path"
+        share="${path%%/*}" # First component = share name.
+        rest="${path#*/}"   # Remaining path (may be empty).
+
+        gvfs_path="${gvfs_base}/smb-share:server=${host},share=${share}"
+        [[ "$rest" != "$path" ]] && [[ -n "$rest" ]] && gvfs_path+="/${rest}"
+    else
+        # Default pattern for other protocols (e.g., 'sftp', 'ftp', etc.).
+        gvfs_path="${gvfs_base}/${scheme}:host=${host}"
+        [[ -n "$path" && "$path" != "$host_path" ]] && gvfs_path+="/${path}"
+    fi
+    gvfs_path=${gvfs_path//%/\\x}
+
+    # shellcheck disable=SC2059
+    printf "$gvfs_path"
+}
+
+# Function: _get_filenames_filemanager
+#
+# Description:
+#   This function retrieves a list of selected filenames or URIs from a file
+#   manager and processes the input accordingly. If no selection is detected,
+#   it falls back to using a standard input file list.
+_get_filenames_filemanager() {
+    local input_files=""
+
+    # Try to use the information provided by the file manager.
+    # Common examples:
+    #   NAUTILUS_SCRIPT_SELECTED_URIS
+    #   NEMO_SCRIPT_SELECTED_URIS
+    #   CAJA_SCRIPT_SELECTED_URIS
+    local var=""
+    var=$(compgen -v | grep -m1 "_SCRIPT_SELECTED_URIS$")
+    if [[ -n "$var" ]]; then
+        eval "input_files=\$$var"
+    fi
+
+    if [[ "$input_files" == "file://"* ]]; then
+        input_files=$(_convert_text_to_delimited_string "$input_files")
+
+        # Decode percent-encoded URIs to readable local paths.
+        input_files=$(_text_uri_decode "$input_files")
+
+    elif [[ "$input_files" == "recent://"* ]] ||
+        [[ "$input_files" == "trash://"* ]]; then
+        # If the input comes from virtual locations ('recent://', 'trash://').
+        input_files=$(_convert_text_to_delimited_string "$input_files")
+
+        # For each virtual URI, resolve its actual file path via 'gio'.
+        local file=""
+        local decoded_input_files=""
+        for file in $input_files; do
+            decoded_input_files+=$(gio info "$file" |
+                grep "standard::target-uri" | cut -f 4- -d " ")
+            decoded_input_files+=$FIELD_SEPARATOR
+        done
+        input_files=$decoded_input_files
+
+        # Decode percent-encoded URIs to readable local paths.
+        input_files=$(_text_uri_decode "$input_files")
+        input_files=$(_str_collapse_char "$input_files" "$FIELD_SEPARATOR")
+    elif [[ "$input_files" == *"://"* ]]; then
+        # If the input comes from other GVfs location ('sftp://', 'smb://').
+        input_files=$(_convert_text_to_delimited_string "$input_files")
+
+        # For each virtual URI, resolve its actual file path.
+        local file=""
+        local decoded_input_files=""
+        for file in $input_files; do
+            decoded_input_files+=$(_translate_to_gvfs_path "$file")
+            decoded_input_files+=$FIELD_SEPARATOR
+        done
+        input_files=$decoded_input_files
+
+        input_files=$(_str_collapse_char "$input_files" "$FIELD_SEPARATOR")
+    else
+        input_files=$INPUT_FILES # Standard input.
+        input_files=$(_str_collapse_char "$input_files" "$FIELD_SEPARATOR")
+    fi
+
+    printf "%s" "$input_files"
+}
+
+# Function: _get_files
+#
+# Description:
+#   This function retrieves a list of files or directories based on the
+#   provided parameters and performs various filtering, validation, and sorting
+#   operations. The input files can be filtered by type, extension, mime type,
+#   etc. It also supports recursive directory expansion and validation of file
+#   conflicts.
+#
+# Parameters:
+#   $1 (parameters): A string containing key-value pairs that configure
+#      the function's behavior. Example: 'par_type=file; par_min_items=2'.
+#
+# Options in '$parameters':
+#   - "par_type": Specifies the type of items to filter.
+#      Supported values:
+#      - "file" (default): Filters files.
+#      - "directory": Filters directories.
+#      - "all": Includes both files and directories.
+#   - "par_recursive": Specifies whether to expand directories recursively.
+#      Supported values:
+#      - "false" (default): Does not expand directories.
+#      - "true": Expands directories recursively.
+#   - "par_max_items", "par_min_items": Limits the number of files.
+#   - "par_select_extension": Filters by file extension.
+#   - "par_select_mime": Filters by MIME type.
+#   - "par_skip_extension": Skips files with specific extensions.
+#   - "par_skip_encoding": Skips files with specific encodings.
+#   - "par_sort_list": If 'true', sorts the list of files.
+_get_files() {
+    local parameters=$1
+    local input_files=""
+    input_files=$(_get_filenames_filemanager)
+
+    # Default values for input parameters.
+    local par_max_items=""
+    local par_min_items=""
+    local par_recursive="false"
+    local par_select_extension=""
+    local par_select_mime=""
+    local par_skip_encoding=""
+    local par_skip_extension=""
+    local par_sort_list="false"
+    local par_type="file"
+
+    # Evaluate the values from the '$parameters' variable.
+    eval "$parameters"
+
+    # NOTE: Handle the case where no file was selected in the file manager, but
+    # 'par_type!=directory' or 'par_type=true'. This is particularly useful for
+    # scripts like 'Open with Terminal', where no file is selected but the
+    # intention is to open the working directory.
+    if (($(_get_items_count "$input_files") == 0)); then
+        if _is_file_manager_session; then
+            if [[ "$par_type" != "file" ]] ||
+                [[ "$par_recursive" == "true" ]]; then
+                # Return the current working directory if no files have been
+                # selected.
+                input_files=$(_get_working_directory)
+            fi
+        fi
+    fi
+
+    # If still no files available, prompt user with selection dialog.
+    if (($(_get_items_count "$input_files") == 0)); then
+        if [[ "$par_type" == "directory" ]] &&
+            [[ "$par_recursive" == "false" ]]; then
+            # Select only directories.
+            input_files=$(_display_file_selection_box \
+                "$(_i18n 'Select input directories')" "" \
+                "par_multiple=true; par_directory_only=true")
+        else
+            # Select files or directories.
+            input_files=$(_display_file_selection_box \
+                "$(_i18n 'Select input files')" "" \
+                "par_multiple=true; par_directory_only=false")
+        fi
+    fi
+
+    local find_parameters=""
+    if (($(_get_items_count "$input_files") == 1)) &&
+        [[ -d "$input_files" ]] && [[ "$par_recursive" == "false" ]] &&
+        printf "%s" "$(basename -- "$input_files")" |
+        grep --quiet --ignore-case --word-regexp "batch"; then
+
+        # HACK: Batch mode. This workaround allows the scripts to handle cases
+        # with a large input list of files. In this case, just select a single
+        # directory with a name that includes the word 'batch'. Then, the
+        # scripts operate on the files within the selected directory. This
+        # addresses the error: "Could not start application: Failed to execute
+        # child process "/bin/sh" (Argument list too long)".
+        local msg=""
+        msg+="$(_i18n 'Batch mode detected.') "
+        msg+="$(_i18n 'Each file inside this directory will be processed individually.')"
+        msg+="\n\n"
+        msg+="$(_i18n 'Would you like to continue?')"
+        if ! _display_question_box "$msg"; then
+            _exit_script
+        fi
+        touch -- "$TEMP_CONTROL_BATCH_ENABLED"
+        find_parameters="-mindepth 1 -maxdepth 1"
+    elif [[ "$par_recursive" == "false" ]]; then
+        # Default non-recursive mode: process only explicitly selected items.
+        find_parameters="-maxdepth 0"
+    fi
+
+    # Pre-select the input files.
+    input_files=$(_find_filtered_files \
+        "$input_files" \
+        "$par_type" \
+        "$par_select_extension" \
+        "$par_skip_extension" \
+        "$find_parameters")
+
+    # NOTE: Handle the case where a file was selected in the file manager, but
+    # 'par_type=directory'. This is particularly useful for scripts like 'Open
+    # with Terminal' where a file is selected, but the intention is to open the
+    # working directory.
+    if (($(_get_items_count "$input_files") == 0)); then
+        if [[ "$par_type" == "directory" ]] && [[ -n "$par_max_items" ]]; then
+            # Return the current working directory if no files have been
+            # selected.
+            input_files=$(_get_working_directory)
+        fi
+    fi
+
+    # Validates the mime or encoding of the file.
+    if [[ -n "$par_select_mime" ]] || [[ -n "$par_skip_encoding" ]]; then
+        input_files=$(_validate_file_mime_parallel \
+            "$input_files" \
+            "$par_select_mime" \
+            "$par_skip_encoding")
+    fi
+
+    # Validate that the final file count meets requirements.
+    _validate_files_count \
+        "$input_files" \
+        "$par_type" \
+        "$par_select_extension" \
+        "$par_select_mime" \
+        "$par_min_items" \
+        "$par_max_items" \
+        "$par_recursive"
+
+    # Sort file list if requested.
+    if [[ "$par_sort_list" == "true" ]]; then
+        input_files=$(_str_sort "$input_files" "$FIELD_SEPARATOR" "false")
+    fi
+
+    # Return the final processed file list.
+    printf "%s" "$input_files"
+}
+
+# Function: _validate_file_mime
+#
+# Description:
+#   This function validates the MIME type and optionally the encoding of a
+#   given file. It checks whether the file's MIME type matches a defined
+#   pattern (regex) and, if provided, whether the file's encoding matches
+#   another pattern.
+#
+# Parameters:
+#   $1 (input_file): The path to the file that is being validated. This is the
+#      file whose MIME type will be checked.
+#   $2 (par_select_mime): Optional. A MIME type pattern (or regular expression)
+#      used to validate the file's MIME type. If this parameter is empty, MIME
+#      type validation is skipped.
+#   $3 (par_skip_encoding): Optional. The encoding pattern (or regular
+#      expression) used to validate the file's encoding. If this parameter is
+#      empty, encoding validation is skipped.
+_validate_file_mime() {
+    local input_file=$1
+    local par_select_mime=$2
+    local par_skip_encoding=$3
+
+    # Validate MIME type if a pattern is provided.
+    if [[ -n "$par_select_mime" ]]; then
+        local file_mime=""
+        file_mime=$(_get_file_mime "$input_file")
+        par_select_mime=${par_select_mime//+/\\+}
+        grep --quiet --ignore-case --perl-regexp \
+            "($par_select_mime)" <<<"$file_mime" || return
+    fi
+
+    # Validate encoding if a pattern is provided.
+    if [[ -n "$par_skip_encoding" ]]; then
+        local file_encoding=""
+        file_encoding=$(_get_file_encoding "$input_file")
+        par_skip_encoding=${par_skip_encoding//+/\\+}
+        grep --quiet --ignore-case --perl-regexp \
+            "($par_skip_encoding)" <<<"$file_encoding" && return
+    fi
+
+    # Create a temp file containing the name of the valid file.
+    _storage_text_write "$input_file$FIELD_SEPARATOR"
+}
+
+# Function: _validate_file_mime_parallel
+#
+# Description:
+#   This function validates the MIME types of multiple files in parallel, based
+#   on a defined MIME type pattern. It processes a list of file paths
+#   concurrently using `xargs` and calls the `_validate_file_mime` function for
+#   each file.
+#
+# Parameters:
+#   $1 (input_files): A space-separated string containing the paths of the
+#      files to validate. These files will be checked for the MIME type
+#      pattern.
+#   $2 (par_select_mime): Optional. The MIME type pattern (or regular
+#      expression) used to validate the files' MIME types. If this parameter is
+#      empty, no MIME type validation is performed, and all input files are
+#      returned as valid.
+#   $3 (par_skip_encoding): Optional. The encoding pattern (or regular
+#      expression) used to validate the files' encodings. If this parameter is
+#      empty, no encoding validation is performed.
+#
+# Example:
+#   - Input: File paths "file1.txt file2.png", MIME pattern "text/plain".
+#   - Output: If "file1.txt" has a MIME type of "text/plain", it will be
+#     included in the output, but "file2.png" will be excluded if its MIME
+#     type doesn't match.
+_validate_file_mime_parallel() {
+    local input_files=$1
+    local par_select_mime=$2
+    local par_skip_encoding=$3
+
+    # Execute the function '_validate_file_mime' for each file in parallel.
+    export -f _validate_file_mime
+    _run_function_parallel \
+        "_validate_file_mime '{}' '$par_select_mime' '$par_skip_encoding'" \
+        "$input_files" "$FIELD_SEPARATOR"
+
+    # Compile valid files in a single list.
+    input_files=$(_storage_text_read_all)
+    _storage_text_clean
+
+    _str_collapse_char "$input_files" "$FIELD_SEPARATOR"
+}
+
+# Function: _validate_files_count
+#
+# Description:
+#   This function validates the number of selected files or directories.
+#
+# Parameters:
+#   $1 (input_files): A space-separated string containing the paths of
+#      files or directories to be validated.
+#   $2 (par_type): A string indicating the type of items to validate.
+#      Supported values:
+#      - "file": Validate files only.
+#      - "directory": Validate directories only.
+#      - "all": Validate both files and directories.
+#   $3 (par_select_extension): A pipe-separated list of file extensions to
+#      filter the files. Files must have one of these extensions.
+#   $4 (par_select_mime): A string representing MIME types to filter the files
+#      by. Only files with matching MIME types are selected.
+#   $5 (par_min_items): The minimum number of valid items required. If fewer
+#      valid items are selected, an error is displayed.
+#   $6 (par_max_items): The maximum number of valid items allowed. If more
+#      valid items are selected, an error is displayed.
+#   $7 (par_recursive): A string indicating whether the validation should be
+#      recursive. If 'true', directories will be searched recursively.
+#
+# Example:
+#   - Input: "dir1 dir2", "file", "txt|pdf", "", 1, 5, "true"
+#   - Output: The function checks if the directories "dir1" and "dir2"
+#     contain at least 1 and no more than 5 ".txt" or ".pdf" files,
+#     recursively.
+_validate_files_count() {
+    local input_files=$1
+    local par_type=$2
+    local par_select_extension=$3
+    local par_select_mime=$4
+    local par_min_items=$5
+    local par_max_items=$6
+    local par_recursive=$7
+    local msg=""
+
+    # Define a label for a valid file.
+    local valid_file_label=""
+    case "$par_type" in
+    "directory") valid_file_label="$(_i18n 'directories')" ;;
+    "all") valid_file_label="$(_i18n 'files or directories')" ;;
+    *) valid_file_label="$(_i18n 'files')" ;;
+    esac
+
+    # Count the number of valid files.
+    local valid_items_count=0
+    valid_items_count=$(_get_items_count "$input_files")
+
+    # Define a label for the extension.
+    local extension_label=""
+    if [[ -n "$par_select_extension" ]]; then
+        extension_label="'.${par_select_extension//|/\' or \'.}'"
+    fi
+
+    # Check if there is at least one valid file.
+    if ((valid_items_count == 0)); then
+        if [[ -n "$par_select_extension" ]]; then
+            msg="$(_i18n 'You must select files with extension:')"
+            _display_error_box "$msg $extension_label!"
+        else
+            if [[ -n "$par_select_mime" ]] || [[ -z "$par_type" ]]; then
+                msg="$(_i18n 'Invalid input file!')"
+                _display_error_box "$msg"
+            else
+                msg="$(_i18n 'You must select')"
+                _display_error_box "$msg $valid_file_label!"
+            fi
+        fi
+        _exit_script
+    fi
+
+    if [[ -n "$par_min_items" ]] && ((valid_items_count < par_min_items)); then
+        msg="$(_i18n 'You must select at least')"
+        _display_error_box "$msg $par_min_items $valid_file_label!"
+        _exit_script
+    fi
+
+    if [[ -n "$par_max_items" ]] && ((valid_items_count > par_max_items)); then
+        msg="$(_i18n 'You must select up to')"
+        _display_error_box "$msg $par_max_items $valid_file_label!"
+        _exit_script
+    fi
+}
+
+#endregion
+#------------------------------------------------------------------------------
+#region Output files
+#------------------------------------------------------------------------------
+
+# Function: _get_output_dir
+#
+# Description:
+#   This function determines and returns the appropriate output directory path
+#   based on the provided parameters and the system's available directories.
+#
+# Parameters:
+#   $1 (parameters): A string containing key-value pairs that configure
+#      the function's behavior. Example: 'par_use_same_dir=true'.
+#
+# Options in '$parameters':
+#   - "par_use_same_dir": If set to 'true', the function uses the base
+#     directory (e.g., current working directory or an alternative with write
+#     permissions) as the output directory. If 'false' or not set, a new
+#     subdirectory is created for the output.
+_get_output_dir() {
+    local parameters=$1
+    local output_dir=""
+
+    # Default values for input parameters.
+    local par_use_same_dir=""
+
+    # Evaluate the values from the '$parameters' variable.
+    eval "$parameters"
+
+    # Attempt to use the current working directory as the base output location.
+    output_dir=$(_get_working_directory)
+
+    # If the working directory is not writable or not defined,
+    # prompt the user to manually select a directory.
+    if [[ ! -w "$output_dir" || -z "$output_dir" ]]; then
+        output_dir=$(_display_file_selection_box \
+            "$(_i18n 'Select the output directory')" "" \
+            "par_multiple=false; par_directory_only=true")
+    fi
+
+    # If the selected directory is still not writable, abort with an error.
+    if [[ ! -w "$output_dir" || -z "$output_dir" ]]; then
+        local msg=""
+        msg="$(_i18n 'Could not find the output directory!')"
+        _display_error_box "$msg"
+        _exit_script
+    fi
+
+    if [[ "$par_use_same_dir" == "true" ]] &&
+        [[ ! -f "$TEMP_CONTROL_BATCH_ENABLED" ]]; then
+        printf "%s" "$output_dir"
+        return
+    fi
+
+    output_dir="$output_dir/$PREFIX_OUTPUT_DIR"
+
+    # If the file already exists, add a suffix.
+    output_dir=$(_get_filename_next_suffix "$output_dir")
+
+    mkdir --parents "$output_dir"
+    printf "%s" "$output_dir"
+}
+
+# Function: _get_output_filename
+#
+# Description:
+#   This function generates the output filename based on the given input file,
+#   output directory, and a set of parameters. It allows for customization of
+#   the output filename by adding prefixes, suffixes, and selecting how the
+#   file extension should be handled.
+#
+# Parameters:
+#   $1 (input_file): The input file for which the output filename will be
+#      generated.
+#   $2 (output_dir): The directory where the output file will be placed.
+#   $3 (parameters): A string containing parameters that define how the output
+#      filename should be constructed.
+#
+# Options in '$parameters':
+#   - "par_extension_opt": Specifies how to handle the file extension.
+#      Supported values:
+#      - "append": Append a new extension 'par_extension' to the existing
+#         file extension.
+#      - "preserve": Keep the original file extension.
+#      - "replace": Replace the current extension with a new one
+#        'par_extension'.
+#      - "strip": Remove the file extension entirely.
+#   - "par_extension": The extension to use when 'par_extension_opt' is set
+#     to 'append' or 'replace'. This value is ignored for the 'preserve'
+#     and 'strip' options.
+#   - "par_prefix": A string to be added as prefix to the output filename.
+#   - "par_suffix": A string to be added as suffix to the output
+#     filename, placed before the extension.
+_get_output_filename() {
+    local input_file=$1
+    local output_dir=$2
+    local parameters=$3
+    local output_file=""
+    local filename=""
+
+    # Default values for input parameters.
+    local par_extension_opt="preserve"
+    local par_extension=""
+    local par_prefix=""
+    local par_suffix=""
+
+    # Evaluate the values from the '$parameters' variable.
+    eval "$parameters"
+
+    filename=$(basename -- "$input_file")
+
+    # Start constructing the output file path with the output directory.
+    output_file="$output_dir/"
+    [[ -n "$par_prefix" ]] && output_file+="$par_prefix "
+
+    if [[ -d "$input_file" ]]; then
+        # Handle case where input_file is a directory.
+        case "$par_extension_opt" in
+        "append" | "replace")
+            output_file+=$filename
+            output_file+=".$par_extension"
+            ;;
+        "preserve" | "strip")
+            output_file+=$filename
+            ;;
+        esac
+    else
+        # Handle case where input_file is a regular file.
+        case "$par_extension_opt" in
+        "append")
+            # Append the new extension to the existing one.
+            output_file+=$(_strip_filename_extension "$filename")
+            [[ -n "$par_suffix" ]] && output_file+=" $par_suffix"
+            output_file+=$(_get_filename_extension "$filename")
+            output_file+=".$par_extension"
+            ;;
+        "preserve")
+            # Preserve the original extension.
+            output_file+=$(_strip_filename_extension "$filename")
+            [[ -n "$par_suffix" ]] && output_file+=" $par_suffix"
+            output_file+=$(_get_filename_extension "$filename")
+            ;;
+        "replace")
+            # Replace the existing extension with the new one.
+            output_file+=$(_strip_filename_extension "$filename")
+            [[ -n "$par_suffix" ]] && output_file+=" $par_suffix"
+            output_file+=".$par_extension"
+            ;;
+        "strip")
+            # Remove the extension.
+            output_file+=$(_strip_filename_extension "$filename")
+            [[ -n "$par_suffix" ]] && output_file+=" $par_suffix"
+            ;;
+        esac
+    fi
+
+    # If the file already exists, add a suffix.
+    output_file=$(_get_filename_next_suffix "$output_file")
+
+    printf "%s" "$output_file"
+}
+
+# Function: _open_items_locations
+#
+# Description:
+#   This function opens the locations of selected items in the appropriate file
+#   manager.
+#
+# Parameters:
+#   $1 (items): A space-separated list of file or directory paths whose
+#      locations will be opened. Paths can be relative or absolute.
+#   $2 (resolve_links): A boolean-like string ('true' or 'false') indicating
+#      whether symbolic links in the provided paths should be resolved to their
+#      target locations before opening.
+_open_items_locations() {
+    local items=$1
+    local par_resolve_links=$2
+
+    # Exit if no items are provided.
+    if [[ -z "$items" ]]; then
+        return
+    fi
+
+    local file_manager=""
+    file_manager=$(_get_available_file_manager)
+
+    # Restore absolute paths for items if relative paths are used.
+    local working_dir=""
+    working_dir=$(_get_working_directory)
+    if [[ -n "$working_dir" ]]; then
+        items=$(sed "s|^\(\./\)\?\([^/].*\)|$working_dir/\2|" <<<"$items")
+    fi
+
+    # Prepare items to be opened by the file manager.
+    local items_open=""
+    local item=""
+    for item in $items; do
+        # Skip the root directory ("/") since opening it is redundant.
+        if [[ "$item" == "/" ]]; then
+            continue
+        fi
+
+        # Resolve symbolic links to their target locations if requested.
+        if [[ "$par_resolve_links" == "true" ]] && [[ -L "$item" ]]; then
+            item=$(readlink -f "$item")
+        fi
+        items_open+="$item$FIELD_SEPARATOR"
+    done
+
+    # Remove leading, trailing, and duplicate field separator.
+    items_open=$(_str_collapse_char "$items_open" "$FIELD_SEPARATOR")
+
+    # Open the items using the detected file manager.
+    case "$file_manager" in
+    "nautilus" | "caja" | "dolphin")
+        # Open the directory of each item and select it.
+        # shellcheck disable=SC2086
+        $file_manager --select $items_open &
+        ;;
+    "nemo" | "thunar")
+        # Open the directory of each item (selection not supported).
+        # shellcheck disable=SC2086
+        $file_manager $items_open &
+        ;;
+    *)
+        # For other file managers (e.g., 'pcmanfm-qt'), open the directory of
+        # each item.
+        local dir=""
+        for item in $items_open; do
+            # Open the directory of the item.
+            dir=$(_get_dirname "$item")
+            if [[ -z "$dir" ]]; then
+                continue
+            fi
+            $file_manager "$dir" &
+        done
+        ;;
+    esac
+}
+
+# Function: _open_urls
+#
+# Description:
+#   This function opens a list of URLs in the system's default web browser.
+#
+# Parameters:
+#   $1 (urls): A space-separated list of URLs to be opened. Each URL
+#      should be a valid web address (e.g., "http://example.com").
+_open_urls() {
+    local urls=$1
+    local url=""
+
+    # Exit if no URLs are provided.
+    if [[ -z "$urls" ]]; then
+        return
+    fi
+
+    for url in $urls; do
+        # Ensure the URL starts with "http://" or "https://".
+        if [[ ! "$url" =~ ^https?:// ]]; then
+            url="https://$url"
+        fi
+
+        xdg-open "$url" &>/dev/null &
+    done
+}
+
+#endregion
+#------------------------------------------------------------------------------
+#region File identification
+#------------------------------------------------------------------------------
+
+# Function: _get_file_encoding
+#
+# Description:
+#   This function retrieves the MIME encoding of a file.
+#
+# Parameters:
+#   $1 (filename): The path to the file whose encoding is to be
+#      determined.
+_get_file_encoding() {
+    local filename=$1
+    local std_output=""
+
+    std_output=$(LC_ALL=C file --dereference --brief --mime-encoding \
+        -- "$filename" 2>/dev/null)
+
+    if [[ "$std_output" == "cannot"* ]]; then
+        return
+    fi
+
+    printf "%s" "$std_output"
+}
+
+# Function: _get_file_mime
+#
+# Description:
+#   This function retrieves the MIME type of a file.
+#
+# Parameters:
+#   $1 (filename): The path to the file whose MIME is to be determined.
+_get_file_mime() {
+    local filename=$1
+    local std_output=""
+
+    std_output=$(LC_ALL=C file --dereference --brief --mime-type \
+        -- "$filename" 2>/dev/null)
+
+    if [[ "$std_output" == "cannot"* ]]; then
+        return
+    fi
+
+    printf "%s" "$std_output"
+}
+
+# Function: _get_items_count
+#
+# Description:
+#   This function counts the number of items in a string, where items are
+#   separated by a specific field separator. It assumes that the input string
+#   contains a list of items separated by the value of the variable
+#   '$FIELD_SEPARATOR'.
+#
+# Parameters:
+# - $1 (input_files): A string containing a list of items separated by
+#   the defined '$FIELD_SEPARATOR'.
+_get_items_count() {
+    local input_files=$1
+    local items_count=0
+
+    if [[ -n "$input_files" ]]; then
+        items_count=$(tr -cd "$FIELD_SEPARATOR" <<<"$input_files" | wc -c)
+        ((items_count++))
+    fi
+
+    printf "%s" "$items_count"
+}
+
+#endregion
+#------------------------------------------------------------------------------
+#region Storage text management
+#------------------------------------------------------------------------------
+
+# Function: _storage_text_clean
+#
+# Description:
+#   This function clears all temporary text storage files.
+_storage_text_clean() {
+    rm -f -- "$TEMP_DIR_STORAGE_TEXT/"* 2>/dev/null
+}
+
+# Function: _storage_text_read_all
+#
+# Description:
+#   This function concatenates and outputs the content of all temporary text
+#   storage files, from largest to smallest.
+_storage_text_read_all() {
+    find "$TEMP_DIR_STORAGE_TEXT" -type f -printf "%s %p\n" 2>/dev/null |
+        sort -n -r | cut -d " " -f 2 - | xargs -r cat --
+}
+
+# Function: _storage_text_write
+#
+# Description:
+#   This function writes a given input text to temporary text storage files.
+#
+# Parameters:
+#   $1 (input_text): The text to be stored in a temporary file.
+_storage_text_write() {
+    local input_text=$1
+    local temp_file=""
+
+    if [[ -z "$input_text" ]] || [[ "$input_text" == $'\n' ]]; then
+        return
+    fi
+
+    # Save the text to be compiled into a single file.
+    temp_file=$(mktemp --tmpdir="$TEMP_DIR_STORAGE_TEXT" 2>/dev/null) ||
+        return 1
+    printf "%s" "$input_text" >"$temp_file"
+}
+
+# Function: _storage_text_write_ln
+#
+# Description:
+#   This function writes a given input text, followed by a newline character,
+#   to a temporary text storage file.
+_storage_text_write_ln() {
+    local input_text=$1
+
+    if [[ -z "$input_text" ]]; then
+        return
+    fi
+
+    _storage_text_write "$input_text"$'\n'
+}
+
+#endregion
+#------------------------------------------------------------------------------
+#region String and text processing
+#------------------------------------------------------------------------------
+
+# Function: _convert_delimited_string_to_text
+#
+# Description:
+#   This function converts a delimited string of items into newline-separated
+#   text.
+#
+# Parameters:
+#   $1 (input_items): A string containing items separated by the
+#      '$FIELD_SEPARATOR' variable.
+#
+# Returns:
+#   - A string containing the items separated by newlines.
+_convert_delimited_string_to_text() {
+    local input_items=$1
+    local new_line="'\$'\\\n''"
+
+    input_items=$(sed -z "s|\n|$new_line|g; s|$new_line$||g" <<<"$input_items")
+    input_items=$(tr "$FIELD_SEPARATOR" "\n" <<<"$input_items")
+
+    printf "%s" "$input_items"
+}
+
+# Function: _convert_text_to_delimited_string
+#
+# Description:
+#   This function converts newline-separated text into a delimited string of
+#   items.
+#
+# Parameters:
+#   $1 (input_items): A string containing items separated by newlines.
+#
+# Returns:
+#   - A string containing the items separated by the '$FIELD_SEPARATOR'
+#   variable.
+_convert_text_to_delimited_string() {
+    local input_items=$1
+    local new_line="'\$'\\\n''"
+
+    input_items=$(tr "\n" "$FIELD_SEPARATOR" <<<"$input_items")
+    input_items=$(sed -z "s|$new_line|\n|g" <<<"$input_items")
+
+    _str_collapse_char "$input_items" "$FIELD_SEPARATOR"
+}
+
+# Function: _get_element
+#
+# Description:
+#   This function extracts the Nth field from a delimited string using the
+#   global '$FIELD_SEPARATOR' as the delimiter.
+#
+# Parameters:
+#   $1 (list): The input string containing delimited fields.
+#   $2 (n): The field index (1-based) to extract from the input string.
+_get_element() {
+    cut -d "$FIELD_SEPARATOR" -f "$2" <<<"$1"
+}
+
+# Function: _str_collapse_char
+#
+# Description:
+#   This function collapses consecutive occurrences of a given character into a
+#   single one and removes any leading or trailing occurrences of it.
+#
+# Parameters:
+#   $1 (input_str): The input string to be processed.
+#   $2 (char): The character to collapse and trim from the string.
+_str_collapse_char() {
+    local input_str=$1
+    local char=$2
+
+    local sed_p1="s|$char$char*|$char|g"
+    local sed_p2="s|^$char||g"
+    local sed_p3="s|$char$||g"
+
+    sed "$sed_p1; $sed_p2; $sed_p3" <<<"$input_str"
+}
+
+# Function: _str_sort
+#
+# Description:
+#   This function sorts elements from a string based on a given separator.
+#
+# Parameters:
+#   $1 (input_str): The input string containing elements to be sorted.
+#   $2 (separator): The character used to separate elements in the string.
+#   $3 (unique): Optional. Flag ("true" or "false") to remove duplicates.
+_str_sort() {
+    local input_str=$1
+    local separator=$2
+    local unique=$3
+
+    local unique_opt=""
+    [[ "$unique" == "true" ]] && unique_opt="--unique"
+
+    input_str=$(printf "%s" "$input_str" | tr "$separator" "\0" |
+        sort --zero-terminated --version-sort $unique_opt |
+        tr "\0" "$separator")
+    _str_collapse_char "$input_str" "$separator"
+}
+
+# Function: _str_human_readable_path
+#
+# Description:
+#   This function transforms a given file path into a more human-readable
+#   format.
+#
+# Parameters:
+#   $1 (input_path): The input file path to process.
+_str_human_readable_path() {
+    local input_path=$1
+    local output_path
+
+    # Remove the current working directory prefix, if present.
+    output_path=$(_text_remove_pwd "$input_path")
+
+    # Replace the absolute home directory path with '~/'.
+    if [[ -n ${HOME:-} ]]; then
+        output_path=${output_path/#$HOME\//~\/}
+    fi
+
+    # Remove a leading './' to simplify relative paths.
+    output_path=${output_path#./}
+
+    printf "%s" "$output_path"
+}
+
+# Function: _text_remove_empty_lines
+_text_remove_empty_lines() {
+    local input_text=$1
+
+    grep -v "^\s*$" <<<"$input_text"
+}
+
+# Function: _text_remove_pwd
+#
+# Description:
+#   This function replaces the current working directory path in a given string
+#   with a dot ('.') for brevity.
+#
+# Parameters:
+#   $1 (input_text): The input string that may contain the current
+#      working directory path.
+#
+# Example:
+#   - Input: "/home/user/project/file.txt" (assuming current directory is
+#     "/home/user/project")
+#   - Output: "./file.txt"
+_text_remove_pwd() {
+    local input_text=$1
+    local working_dir=""
+    working_dir=$(_get_working_directory)
+
+    if [[ -n "$working_dir" && "$working_dir" != "/" ]]; then
+        sed "s|$working_dir/||g" <<<"$input_text"
+    else
+        printf "%s" "$input_text"
+    fi
+}
+
+# Function: _text_sort
+#
+# Description:
+#   This function sorts the lines of a given text input in a version-aware
+#   manner.
+#
+# Parameters:
+#   $1 (input_text): The input text to be sorted, where each line is
+#      treated as a separate string.
+_text_sort() {
+    local input_text=$1
+
+    sort --version-sort <<<"$input_text"
+}
+
+# Function: _text_uri_decode
+#
+# Description:
+#   This function decodes a URI-encoded string by converting percent-encoded
+#   characters back to their original form.
+#
+# Parameters:
+#   $1 (uri_encoded): The URI-encoded string that needs to be decoded.
+#
+# Example:
+#   - Input: "file:///home/user%20name/file%20name.txt"
+#   - Output: "/home/user name/file name.txt"
+_text_uri_decode() {
+    local uri_encoded=$1
+
+    uri_encoded=${uri_encoded//%/\\x}
+    uri_encoded=${uri_encoded//file:\/\//}
+
+    # shellcheck disable=SC2059
+    printf "$uri_encoded"
+}
+
+#endregion
+#------------------------------------------------------------------------------
+#region External application wrappers
+#------------------------------------------------------------------------------
+
+# Function: _cmd_magick_convert
+#
+# Description:
+#   This function executes ImageMagick's "convert". In ImageMagick 7+, the main
+#   executable is "magick". In ImageMagick 6 (legacy version), the command
+#   "convert" is used directly.
+#
+# Parameters:
+#   $@ : Arguments to be passed to the convert command.
+_cmd_magick_convert() {
+    if _command_exists "magick"; then
+        magick "$@"
+    else
+        convert "$@"
+    fi
+}
+
+# Function: _initialize_homebrew
+#
+# Description:
+#   This function initializes the Homebrew environment if it is installed in
+#   the user's local directory.
+_initialize_homebrew() {
+    # Skip initialization if Homebrew is already available in 'PATH'.
+    [[ -n "${HOMEBREW_PREFIX:-}" ]] && return
+
+    local homebrew_dir="$HOME/.local/apps/homebrew"
+    local brew_cmd="$homebrew_dir/bin/brew"
+
+    if [[ -f "$brew_cmd" ]]; then
+        # Skip initialization if 'curl' and 'git' are not available in 'PATH'.
+        if _command_exists "curl" && _command_exists "git"; then
+            # Load the Homebrew environment into the current shell session.
+            eval "$($brew_cmd shellenv)"
+        fi
+    fi
+}
+
+#endregion
+#------------------------------------------------------------------------------
+#region Internationalization (i18n)
+#------------------------------------------------------------------------------
+
+# Function: _i18n_initialize
+#
+# Description:
+#   This function initializes the internationalization (i18n) system by
+#   determining the current language from the system and loading the
+#   corresponding '.po' translation file into the '$I18N_DATA' array.
+_i18n_initialize() {
+    # LANG not set: nothing to load
+    if [[ -z "${LANG:-}" ]]; then
+        return
+    fi
+
+    local lang_full="${LANG%%.*}"      # e.g. 'pt_BR.UTF-8' to 'pt_BR'.
+    local lang_base="${lang_full%%_*}" # e.g. 'pt_BR to' 'pt'.
+    local po_file=""
+
+    # Try full locale first (e.g. pt_BR.po).
+    po_file="$I18N_DIR/$lang_full.po"
+    if [[ -f "$po_file" ]]; then
+        _i18n_load_file "$po_file"
+        return
+    fi
+
+    # Fallback to base language (e.g. pt.po).
+    po_file="$I18N_DIR/$lang_base.po"
+    if [[ -f "$po_file" ]]; then
+        _i18n_load_file "$po_file"
+    fi
+}
+
+# Function: _i18n_load_file
+#
+# Description:
+#   This function reads a PO (Portable Object) file line by line, extracting
+#   the translation strings and storing them in the array '$I18N_DATA'.
+#
+# Parameters:
+#   $1 (po_file): Path to the .po file to be loaded.
+_i18n_load_file() {
+    local po_file=$1
+    local key=""
+    local val=""
+
+    # Read line-by-line (handles multi-line strings).
+    local line=""
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        case "$line" in
+        "msgid"*)
+            key="${line#msgid }"
+            key="${key%\"}"
+            key="${key#\"}"
+            ;;
+        "msgstr"*)
+            val="${line#msgstr }"
+            val="${val%\"}"
+            val="${val#\"}"
+            ;;
+        "")
+            # End of entry: store in array.
+            if [[ -n "$key" ]] && [[ -n "$val" ]]; then
+                I18N_DATA["$key"]="$val"
+                key=""
+                val=""
+            fi
+            ;;
+        esac
+    done <"$po_file"
+}
+
+# Function: _i18n
+#
+# Description:
+#   This function returns the translated version of a given string using the
+#   '$I18N_DATA' array loaded. If a translation is not available, it returns
+#   the original string.
+#
+# Parameters:
+#   $1 (msgid): The string to be translated.
+_i18n() {
+    local msgid=$1
+
+    if [[ -n "$msgid" ]] && [[ -n "${I18N_DATA[$msgid]:-}" ]]; then
+        printf "%s" "${I18N_DATA[$msgid]}"
+    else
+        printf "%s" "$msgid"
+    fi
+}
+
+#endregion
+#------------------------------------------------------------------------------
+#region Scripts recent history
+#------------------------------------------------------------------------------
+
+# Function: _recent_scripts_add
+#
+# Description:
+#   This function adds the running script to the history of recently accessed
+#   scripts.
+#
+# Returns:
+#   0 (true): If the script was added successfully.
+#   1 (false): If there was an error adding the script.
+_recent_scripts_add() {
+    local running_script=$0
+    local dir=""
+    dir="$ROOT_DIR/$(_i18n 'Accessed recently')"
+
+    # Part 1: Add the link.
+
+    # Check that the '$dir' exists and is writable.
+    if [[ ! -d "$dir" ]]; then
+        mkdir -p "$dir"
+    else
+        [[ -w "$dir" ]] || return 1
+    fi
+
+    if [[ "$0" != "/"* ]]; then
+        # If '$0' is a relative path, resolve it relative to the current
+        # working directory.
+        running_script="$SCRIPT_DIR/"$(basename -- "$0")
+    fi
+
+    # Resolve symbolic links to their target locations.
+    if [[ -L "$running_script" ]]; then
+        running_script=$(readlink -f "$running_script")
+    fi
+
+    _directory_push "$dir" || return 1
+
+    # Remove any existing links pointing to the same script.
+    find "$dir" -lname "$running_script" \
+        -exec rm -f -- {} +
+
+    # Create a new symbolic link with a ".00" prefix.
+    ln -s -- "$running_script" ".00 $(_get_script_name)"
+
+    _directory_pop || return 1
+
+    # Part 2: Organize links.
+    local links=()
+    local link=""
+    while IFS= read -r -d $'\0' link; do
+        # Check if the link is broken.
+        if [[ ! -e "$link" ]]; then
+            # Remove broken links.
+            rm -f -- "$link"
+        else
+            links+=("$link")
+        fi
+    done < <(find "$dir" -maxdepth 1 -type l \
+        -print0 2>/dev/null | sort --zero-terminated --numeric-sort)
+
+    # Process the links, keeping only the '$ACCESSED_RECENTLY_LINKS_TO_KEEP'
+    # most recent.
+    local count=1
+    local link_name=""
+    for link in "${links[@]}"; do
+        if ((count <= ACCESSED_RECENTLY_LINKS_TO_KEEP)); then
+            # Rename the link with a numeric prefix for ordering.
+            link_name=$(basename "$link" |
+                sed --regexp-extended 's|^.?[0-9]{2} ||')
+            mv -f -- "$link" "$dir/$(printf '%02d' "$count") $link_name" \
+                2>/dev/null
+            ((count++))
+        else
+            # Remove excess links.
+            rm -f -- "$link"
+        fi
+    done
+}
+
+#endregion
+
+_i18n_initialize
+
+# Initialize Homebrew environment if available.
+_initialize_homebrew
+
+# If running from a supported file manager and the scripts directory is
+# writable, update the list of recently accessed scripts.
+if _is_file_manager_session && [[ -w $SCRIPT_DIR ]]; then
+    _recent_scripts_add
+fi

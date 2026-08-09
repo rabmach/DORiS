@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Kill the xscreensaver process.
+exec killall -15 xscreensaver

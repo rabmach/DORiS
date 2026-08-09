@@ -1,0 +1,21 @@
+# doris extra packages - NOT installed by default.
+# Install with: ./restore.sh --extras   (or uncomment lines you want)
+# One package name per line; '#' starts a comment.
+
+# screen recording
+simplescreenrecorder
+
+# BunsenLabs-flavoured leftovers (installed on the reference box, not core)
+#tint2
+#pcmanfm
+#gmrun
+
+# productivity / misc (niche but handy)
+freeplane
+vym
+planner
+yelp
+neverputt
+mintstick
+meld
+mpg123

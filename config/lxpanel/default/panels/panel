@@ -1,0 +1,60 @@
+# lxpanel <profile> config file. Manually editing is not recommended.
+# Use preference dialog in lxpanel to adjust config when you can.
+
+Global {
+  edge=top
+  allign=left
+  margin=3
+  widthtype=percent
+  width=35
+  height=26
+  transparent=0
+  tintcolor=#040404
+  alpha=0
+  setdocktype=1
+  setpartialstrut=0
+  usefontcolor=0
+  fontcolor=#9141ac
+  usefontsize=0
+  fontsize=11
+  background=0
+  backgroundfile=/home/$USER/.config/lxpanel/panel2.png
+  align=left
+  monitor=0
+  iconsize=28
+  autohide=1
+  heightwhenhidden=0
+}
+Plugin {
+  type=tray
+  Config {
+  }
+}
+Plugin {
+  type=space
+  Config {
+    Size=70
+  }
+  expand=0
+}
+Plugin {
+  type=taskbar
+  Config {
+  }
+}
+Plugin {
+  type=volume
+  Config {
+  }
+}
+Plugin {
+  type=dclock
+  Config {
+    ClockFmt=%H:%M
+    TooltipFmt=%A, All Day - %d %b %y
+    BoldFont=0
+    IconOnly=0
+    CenterText=0
+    Action=gsimplecal
+  }
+}

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Launch Mint Stick (USB image writer) as root.
+exec sudo mintstick -m iso

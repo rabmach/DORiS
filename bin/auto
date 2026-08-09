@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Edit the Openbox autostart file.
+exec x-text-editor ~/.config/openbox/autostart

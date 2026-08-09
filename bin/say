@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Speak text aloud: say "hello world"
+if [ $# -eq 0 ]; then
+    echo "usage: say [text ...]" >&2
+    exit 1
+fi
+exec espeak -v mb-en1 -s170 "$@"

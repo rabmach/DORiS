@@ -1,0 +1,10 @@
+[Unit]
+Description=AppArmor observation review reminder (weekly)
+
+[Service]
+Type=oneshot
+Environment=DISPLAY=:0
+ExecStart=%h/bin/apparmor-review
+
+[Install]
+WantedBy=timers.target

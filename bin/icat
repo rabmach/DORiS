@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Display an image in the terminal with kitty's icat (kitty terminal only).
+exec ~/Downloads/kitty-0.45.0-x86_64/bin/kitten icat "$@"

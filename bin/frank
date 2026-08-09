@@ -1,0 +1,4 @@
+#!/bin/sh
+
+#notify-send -t 6000 -i "$HOME/Pictures/bksplp.png" "WOOHOO!" "<b>What a beautiful day</b>"
+notify-send -t 10000 -i face-laugh "WOOHOO!" "<b>What a beautiful day</b>"

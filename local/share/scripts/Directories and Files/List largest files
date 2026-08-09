@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# install_keyboard_shortcut=<Control><Alt>B
+
+# Source the script '.common-functions.sh'.
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+ROOT_DIR=$(grep --only-matching "^.*scripts[^/]*" <<<"$SCRIPT_DIR")
+source "$ROOT_DIR/.common-functions.sh"
+
+_main() {
+    local input_files=""
+    local std_output=""
+    local max_item_list=30
+
+    # Execute initial checks.
+    _check_dependencies ""
+    _display_wait_box
+    input_files=$(_get_files "par_type=all")
+
+    # Run the main process.
+    # shellcheck disable=SC2086
+    std_output=$(find $input_files \
+        ! -path "$IGNORE_FIND_PATH" \
+        -type f -printf "%s$FIELD_SEPARATOR%p\n" 2>/dev/null |
+        sort -n -r | head -n "$max_item_list" |
+        numfmt --to=iec --suffix=B --delimiter="$FIELD_SEPARATOR" --field=1)
+
+    std_output=$(_text_remove_pwd "$std_output")
+
+    _display_list_box "$std_output" "par_item_name=$(_i18n 'files'); par_columns='--column:$(_i18n 'Size'),--column:$(_i18n 'File')'; par_action=open_location; par_check_type=checkbox"
+}
+
+_main "$@"

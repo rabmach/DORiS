@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Stream WICN (jazz) radio.
+exec mpg123 https://wicn-ice.streamguys1.com/live-mp3

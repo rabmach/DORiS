@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Incremental backup of the home directory to the restorish drive.
+exec rsync -avuPz --exclude="lost+found" --exclude="Trash" --exclude="Music" --exclude=".cache" --exclude="storage" $HOME/ /media/bk/restorish/current-trixie-p53s/16thmay/bk

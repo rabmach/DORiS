@@ -1,0 +1,6 @@
+# cron entry for debsecan
+MAILTO=root
+
+22 4 * * 1 daemon test -x /usr/bin/debsecan && /usr/bin/debsecan --cron
+# (Note: debsecan delays actual processing past 2:00 AM, and runs only
+# once per day.)

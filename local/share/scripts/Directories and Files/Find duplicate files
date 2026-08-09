@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2001
+# install_keyboard_shortcut=<Control><Alt>U
+
+# Source the script '.common-functions.sh'.
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+ROOT_DIR=$(grep --only-matching "^.*scripts[^/]*" <<<"$SCRIPT_DIR")
+source "$ROOT_DIR/.common-functions.sh"
+
+_main() {
+    local input_files=""
+    local std_output=""
+    local temp_file=""
+
+    # Execute initial checks.
+    _check_dependencies "rdfind"
+    _display_wait_box
+    input_files=$(_get_files "par_type=all")
+
+    # Work on a temporary file.
+    temp_file=$(_make_temp_file)
+
+    # Run the main process.
+    # shellcheck disable=SC2086
+    # NOTE: The 'rdfind' does not support '--' in the command line.
+    LC_ALL=C rdfind -dryrun true -removeidentinode false -outputname "$temp_file" $input_files &>/dev/null
+
+    # Parse the output.
+    std_output=$(awk 'BEGIN { id = 0 }
+        # Skip any line that contains a .git directory before processing.
+        /\.git\// { next }
+
+        # Increment ID only for first-occurence.
+        /^DUPTYPE_FIRST_OCCURRENCE/ { id++ }
+
+        # Process all DUPTYPE_ lines.
+        /^DUPTYPE_/ {
+            # Extract the file path starting from field 8.
+            file = substr($0, index($0, $8))
+
+            # Replace double slashes with a single slash.
+            while (file ~ /\/\//)
+                gsub(/\/\//, "/", file)
+
+            # Output the ID and the file path.
+            print id "\r" file
+        }' < "$temp_file")
+    rm -f -- "$temp_file"
+
+    std_output=$(_text_remove_pwd "$std_output")
+
+    _display_list_box "$std_output" "par_item_name=$(_i18n 'files'); par_columns='--column:$(_i18n 'Group'),--column:$(_i18n 'File')'; par_action=open_location; par_check_type=checkbox"
+}
+
+_main "$@"

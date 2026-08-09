@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# install_keyboard_shortcut=<Control><Alt>P
+
+# Source the script '.common-functions.sh'.
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+ROOT_DIR=$(grep --only-matching "^.*scripts[^/]*" <<<"$SCRIPT_DIR")
+source "$ROOT_DIR/.common-functions.sh"
+
+_main() {
+    local input_files=""
+
+    # Execute initial checks.
+    _check_dependencies ""
+    _display_wait_box
+    input_files=$(_get_files "par_type=all")
+
+    # Run the main process.
+    # shellcheck disable=SC2086
+    std_output=$(find $input_files \
+        ! -path "$IGNORE_FIND_PATH" \
+        -printf "%m$FIELD_SEPARATOR%u$FIELD_SEPARATOR%g$FIELD_SEPARATOR%y$FIELD_SEPARATOR%p\n" 2>/dev/null)
+
+    std_output=$(_text_remove_pwd "$std_output")
+    std_output=$(_text_sort "$std_output")
+
+    _display_list_box "$std_output" "par_item_name=$(_i18n 'items'); par_columns='--column:$(_i18n 'Octal'),--column:$(_i18n 'User'),--column:$(_i18n 'Group'),--column:$(_i18n 'Type'),--column:$(_i18n 'File')'; par_action=open_location; par_check_type=checkbox"
+}
+
+_main "$@"

@@ -1,0 +1,368 @@
+<!-- machiner -->
+<openbox_menu xmlns="http://openbox.org/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://openbox.org/">
+ <menu id="root-menu" label="Openbox 3">
+<!--obamenu for the application goodness -->
+<menu id="apps-menu" label="Apps" icon="/usr/share/icons/Dracula/apps/scalable/0ad.svg" execute="~/bin/obamenu.py" />
+         <!--end obamenu for the application goodness -->
+ <!--Scrot Menu-->
+<menu id="scrot" label="Scrot" icon="/usr/share/icons/Dracula/apps/scalable/screenie.svg">
+      <item label="click and done" icon="/usr/share/icons/Dracula/apps/scalable/screensaver.svg">
+		<action name="Execute">
+		<execute>
+		scrot -q 100 '%Y-%m-%d_$wx$h_%X.jpg' -e 'mv $f ~/scrots/'
+		</execute>
+		</action>
+		</item>
+		<item label="delay 5" icon="/usr/share/icons/Dracula/apps/scalable/shotwell.svg">
+		<action name="Execute">
+		<execute>
+		scrot -q 100  '%Y-%m-%d_$wx$h_%X.jpg' -d 5 -e 'mv $f ~/scrots/'
+		</execute>
+		</action>
+		</item>
+		<item label="Select Area" icon="/usr/share/icons/Dracula/apps/scalable/shutter.svg">
+		<action name="Execute">
+		<execute>
+		scrot -q 100  '%Y-%m-%d_$wx$h_%X.jpg' -s -e 'mv $f ~/scrots/'
+		</execute>
+		</action>
+		</item>
+		<item label="screen with 20% thumb" icon="/usr/share/icons/Dracula/apps/scalable/silicon-32.svg">
+		<action name="Execute">
+		<execute>
+		scrot -q 100  '%Y-%m-%d_$wx$h_%X.jpg' -t 30 -e 'mv $f ~/scrots/'
+		</execute>
+		</action>
+		</item>
+</menu>
+<menu id="pianobar" label="Pianobar" icon="/usr/share/icons/Dracula/apps/scalable/screenie.svg">
+  <item label="Play" icon="/usr/share/icons/kora/actions/16/media-play.svg">
+      <action name="Execute">
+<command>~/.config/pianobar/control-pianobar.sh p</command>
+      </action>
+   </item>
+     <item label="Pause" icon="/usr/share/icons/kora/actions/16/media-playback-pause.svg">
+      <action name="Execute">
+<command>~/.config/pianobar/control-pianobar.sh p</command>
+      </action>
+   </item>
+    <item label="Next" icon="/usr/share/icons/kora/actions/16/media-seek-forward.svg">
+      <action name="Execute">
+<command>~/.config/pianobar/control-pianobar.sh next</command>
+      </action>
+   </item>
+    <item label="Previous" icon="/usr/share/icons/kora/actions/16/media-seek-backward.svg">
+      <action name="Execute">
+<command>~/.config/pianobar/control-pianobar.sh history</command>
+      </action>
+   </item>
+    <item label="Like" icon="/usr/share/icons/kora/emblems/symbolic/xsi-emblem-favorite-symbolic.svg">
+      <action name="Execute">
+<command>~/.config/pianobar/control-pianobar.sh love</command>
+      </action>
+   </item>
+    <item label="Ban" icon="/usr/share/icons/kora/actions/symbolic/action-unavailable-symbolic.svg">
+      <action name="Execute">
+<command>~/.config/pianobar/control-pianobar.sh ban</command>
+      </action>
+   </item>
+    <item label="Change Station" icon="/usr/share/icons/kora/emblems/symbolic/emblem-music-symbolic.svg">
+      <action name="Execute">
+<command>~/.config/pianobar/control-pianobar.sh switchstation</command>
+      </action>
+   </item>
+    <item label="Quit" icon="/usr/share/icons/kora/actions/16/quickopen.svg">
+      <action name="Execute">
+<command>~/.config/pianobar/control-pianobar.sh quit</command>
+      </action>
+   </item>
+   </menu>
+<!-- end scrot menu -->
+<!-- scripts-->
+ <!--  <menu icon="/usr/share/icons/Dracula/apps/scalable/7596_iexplore.0.svg"  execute="~/bin/procinfo.pl" id="proc-menu" label="Processes"/> -->
+   <menu icon="/usr/share/icons/Dracula/apps/scalable/7765_winebrowser.0.svg"  execute="~/bin/datemenu.py" id="date-menu" label="Forward"/>
+  <menu icon="/usr/share/icons/kora/status/scalable/face-cool.svg"  execute="~/bin/recent.sh" id="recent" label="Recent"/> 
+   <menu icon="/usr/share/icons/Dracula/apps/scalable/7kaa.svg"  execute="~/bin/places-pipemenu" id="places" label="~/"/> 
+ <!-- end scripts -->
+<!-- weather pipemenu -->
+<menu id="weather" label="Weather" icon="/usr/share/icons/Dracula/apps/scalable/org.gnome.Weather.svg" execute="~/bin/weather.sh -o" />
+<!-- end weather pipemenu -->
+<!--
+<menu icon="/usr/share/icons/Dracula/apps/scalable/7765_winebrowser.0.svg"   execute="~/.config/openbox/show_ob_keybindings.py" id="showkeys" label="Keybindings"/>
+<seperator/>
+-->
+        <!-- character menu -->
+<menu id="character map" label="Characters" icon="/usr/share/icons/Dracula/apps/scalable/1password.svg">
+    <item label="&#224;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#224;
+          </execute>
+       </action>
+    </item>
+    <item label="rock n roll">
+       <action name="Execute">
+          <execute>
+             xdotool type &#92;&#109;&#47;&#32;&#62;&#95;&#60;&#32;&#92;&#109;&#47;
+          </execute>
+       </action>
+    </item>
+    <item label="&#164;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#164;
+          </execute>
+       </action>
+    </item>
+        <item label="&#176;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#176;
+          </execute>
+       </action>
+    </item>
+    <item label="&#188;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#188;
+          </execute>
+       </action>
+    </item>
+        <item label="&#189;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#189;
+          </execute>
+       </action>
+    </item>
+        <item label="&#190;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#190;
+          </execute>
+       </action>
+    </item>
+        <item label="&#191;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#191;
+          </execute>
+       </action>
+    </item>
+    <item label="&#230;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#230;
+          </execute>
+       </action>
+    </item>
+    <item label="&#231;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#231;
+          </execute>
+       </action>
+    </item>
+    <item label="&#8800;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#8800;
+          </execute>
+       </action>
+    </item>
+    <item label="&#177;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#177;
+          </execute>
+       </action>
+    </item>
+    <item label="&#8734;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#8734;
+          </execute>
+       </action>
+    </item>
+    <item label="&#60;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#60;
+          </execute>
+       </action>
+    </item>
+    <item label="&#62;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#62;
+          </execute>
+       </action>
+    </item>
+    <item label="&#225;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#225;
+          </execute>
+       </action>
+    </item>
+    <item label="&#226;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#226;
+          </execute>
+       </action>
+    </item>
+    <item label="&#228;" >
+       <action name="Execute">
+          <execute>
+             xdotool type &#228;
+          </execute>
+       </action>
+    </item>
+    <item label="&#232;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#232;
+          </execute>
+       </action>
+    </item>
+    <item label="&#233;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#233;
+          </execute>
+       </action>
+    </item>
+    <item label="&#234;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#234;
+          </execute>
+       </action>
+    </item>
+    <item label="&#235;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#235;
+          </execute>
+       </action>
+    </item>
+    <item label="&#236;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#236;
+          </execute>
+       </action>
+    </item>
+    <item label="&#237;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#237;
+          </execute>
+       </action>
+    </item>
+    <item label="&#238;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#238;
+          </execute>
+       </action>
+    </item>
+    <item label="&#239;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#239;
+          </execute>
+       </action>
+    </item>
+    <item label="&#242;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#242;
+          </execute>
+       </action>
+    </item>
+    <item label="&#243;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#243;
+          </execute>
+       </action>
+    </item>
+    <item label="&#244;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#244;
+          </execute>
+       </action>
+    </item>
+    <item label="&#245;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#245;
+          </execute>
+       </action>
+    </item>
+    <item label="&#249;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#249;
+          </execute>
+       </action>
+    </item>
+    <item label="&#250;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#250;
+          </execute>
+       </action>
+    </item>
+    <item label="&#251;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#251;
+          </execute>
+       </action>
+    </item>
+    <item label="&#252;">
+       <action name="Execute">
+          <execute>
+             xdotool type &#252;
+          </execute>
+       </action>
+    </item>
+</menu>
+<!-- end character menu -->
+  <item label="Flick Picker" icon="/usr/share/icons/Dracula/apps/scalable/screensaver.svg">
+      <action name="Execute">
+      <execute>sh ~/bin/pick.sh
+      </execute>
+      </action>
+      </item>
+ <!-- logout -->
+	<item label="adios" icon="/usr/share/icons/Dracula/apps/scalable/zenmap.svg">
+		<action name="Execute">
+			<command>obsession-logout -p "Beat Feet, Man" -b ~/Pictures/truckin-bnl67.jpg</command>
+		</action>
+	</item>
+<!-- end logout -->
+<!--
+	<item label="Shutdown" icon="/usr/share/icons/kora/panel/16/system-shutdown-panel.svg">
+		<action name="Execute">
+			<command>systemctl poweroff</command>
+		</action>
+	</item>
+	<item label="Restart" icon="/usr/share/icons/kora/panel/16/system-shutdown-panel-restart.svg">
+		<action name="Execute">
+		        <command>systemctl reboot</command>
+		</action>
+	</item>
+	<item label="Hibernate" icon="/usr/share/icons/kora/panel/16/gpm-hibernate.svg">
+		<action name="Execute">
+		        <command>systemctl hibernate</command>
+		</action>
+	</item>
+</menu>
+-->
+    </menu>
+    </openbox_menu>

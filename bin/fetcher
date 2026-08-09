@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Neofetch-style system info (fastfetch).
+exec fastfetch

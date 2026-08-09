@@ -1,0 +1,11 @@
+#[ -d ~/.screenlayout ] && "$(ls ~/.screenlayout/*.sh | head -1)"
+waldesk &
+solaar &
+(sleep 1s && ~/bin/fastcompmgr -o 0.4 -r 12 -c -C) &
+(sleep 4s && ~/bin/frank) &
+#(sleep 6s && ~/bin/greet.sh) &
+#sh ~/.fehbg &
+#(sleep 8s && ~/bin/whoareyou) &
+#pnmixer &
+#tint2 &
+

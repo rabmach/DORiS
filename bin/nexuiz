@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# DORiS - nexuiz launcher
+# Temporary, self-restoring performance tweaks around an old, CPU-bound
+# game session on amd64. Nothing here is persistent: governor, EPP and
+# C-states are restored the moment the game exits.
+#
+# Tolerant by design: every knob is existence-checked before it is
+# touched, and every write goes through sudo (this box has passwordless
+# sudo). On hardware without intel_idle, cpufreq, or an EPP knob this is
+# a no-op - it only ever runs when someone deliberately launches the
+# game. If sudo can't prompt (e.g. launched from a keybind), the tweaks
+# are skipped and the game still runs.
+set -uo pipefail
+
+GAME_DIR="${NEXUIZ_DIR:-$HOME/Nexuiz}"
+
+# ── find a launcher: SDL build preferred, then GLX, then PATH ──
+launcher=""
+for cand in \
+    "$GAME_DIR/nexuiz-linux-sdl.sh" \
+    "$GAME_DIR/nexuiz-linux-glx.sh" \
+    "$GAME_DIR/nexuiz-linux-sdl" \
+    "$GAME_DIR/nexuiz-linux-x86_64-sdl" \
+    "$GAME_DIR/nexuiz-linux-x86_64-glx"; do
+    [[ -x "$cand" ]] && { launcher="$cand"; break; }
+done
+[[ -n "$launcher" ]] || launcher="$(command -v nexuiz || true)"
+if [[ -z "$launcher" ]]; then
+    echo "!! nexuiz not found (looked in $GAME_DIR and PATH)." >&2
+    exit 1
+fi
+
+CPU=/sys/devices/system/cpu
+
+# sudo write helper: values and paths here are simple, no quoting needed.
+sw() { sudo sh -c "echo '$2' > '$1'" 2>/dev/null; }
+
+saved_gov=() saved_epp=() disabled_states=()
+
+# ── remember + set governor / EPP to performance ─────────────
+for c in "$CPU"/cpu[0-9]*; do
+    [[ -e "$c/cpufreq/scaling_governor" ]] || continue
+    saved_gov+=("$c $(cat "$c/cpufreq/scaling_governor" 2>/dev/null)")
+    if grep -qw performance "$c/cpufreq/scaling_available_governors" 2>/dev/null; then
+        sw "$c/cpufreq/scaling_governor" performance
+    fi
+    if [[ -w "$c/cpufreq/energy_performance_preference" ]]; then
+        saved_epp+=("$c $(cat "$c/cpufreq/energy_performance_preference" 2>/dev/null)")
+        sw "$c/cpufreq/energy_performance_preference" performance
+    fi
+done
+
+# ── disable deep C-states (everything deeper than C1E) ───────
+for s in "$CPU"/cpu0/cpuidle/state*; do
+    [[ -e "$s/disable" ]] || continue
+    name="$(cat "$s/name" 2>/dev/null)"
+    case "$name" in
+        POLL|C1|C1E) : ;;
+        *)
+            if [[ "$(cat "$s/disable" 2>/dev/null)" != "1" ]]; then
+                disabled_states+=("$s")
+                sw "$s/disable" 1
+            fi
+            ;;
+    esac
+done
+
+# ── restore on exit, no matter how the game leaves ───────────
+restore() {
+    local entry
+    for entry in "${saved_gov[@]}"; do
+        set -- $entry
+        sw "$1/cpufreq/scaling_governor" "$2"
+    done
+    for entry in "${saved_epp[@]}"; do
+        set -- $entry
+        sw "$1/cpufreq/energy_performance_preference" "$2"
+    done
+    for s in "${disabled_states[@]}"; do
+        sw "$s/disable" 0
+    done
+}
+trap restore EXIT
+
+echo "  nexuiz: $(basename "$launcher")  (nice -n -5; perf tweaks auto-restore)"
+exec nice -n -5 "$launcher" "$@"

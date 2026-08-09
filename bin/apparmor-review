@@ -1,0 +1,44 @@
+#!/bin/bash
+# AppArmor observation review helper - created 2026-08-05.
+# Run it any time (it also pops a desktop notification):
+#   ~/bin/apparmor-review
+#
+# When the ~1-week observation window ends (reminder fires 2026-08-12):
+#   1. Build allow-lists from real usage:
+#        sudo aa-logprof -p helium-bin
+#        sudo aa-logprof -p sublime_text
+#   2. Review what it proposes (esp. sublime: which paths you edit,
+#      network for Package Control), then enforce:
+#        sudo aa-enforce /etc/apparmor.d/helium-bin
+#        sudo aa-enforce /etc/apparmor.d/sublime-text
+#   3. Shrink the audit log cap back to normal:
+#        sudo sed -i 's/^max_log_file = .*/max_log_file = 8/' /etc/audit/auditd.conf
+#        sudo systemctl restart auditd
+#   4. Silence this timer:
+#        systemctl --user disable --now apparmor-review-reminder.timer
+
+set -u
+
+in_complain() {
+  sudo aa-status 2>/dev/null \
+    | sed -n '/profiles are in complain/,/processes are in complain/p' \
+    | grep -qw "$1"
+}
+
+events() {
+  sudo ausearch -m AVC --start week --raw 2>/dev/null | grep -c "profile=\"$1\""
+}
+
+summary=""
+for p in helium-bin sublime_text; do
+  if in_complain "$p"; then mode="complain (still observing)"; else mode="not in complain (enforced or off)"; fi
+  n=$(events "$p")
+  summary+="$p: $mode - $n audit events this week
+"
+done
+
+echo "$summary"
+
+notify-send -i dialog-information "AppArmor review due" "$summary
+Review + enforce: aa-logprof -p helium-bin / sublime_text, then aa-enforce.
+Full instructions: ~/bin/apparmor-review" 2>/dev/null || true
