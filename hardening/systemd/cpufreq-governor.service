@@ -1,0 +1,11 @@
+[Unit]
+Description=Set CPU governor to powersave
+After=systemd-modules-load.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'for g in /sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_governor; do echo powersave > "$g"; done'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target

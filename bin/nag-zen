@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+MESSAGE="Hey, man, it's time"
+
+to_seconds() {
+  local num="$1"
+  local unit="$2"
+  case "$unit" in
+    second|seconds) echo "$num" ;;
+    minute|minutes|"") echo $((num * 60)) ;;
+    hour|hours) echo $((num * 3600)) ;;
+    day|days) echo $((num * 86400)) ;;
+    *) echo $((num * 60)) ;;
+  esac
+}
+
+if ! which zenity >/dev/null 2>&1; then
+  echo "Error: zenity is required for nag-zen"
+  exit 1
+fi
+
+TIME_INPUT=$(zenity --entry --title="nag" --text="Remind me in..." --ok-label="Set" --entry-text="15 minutes")
+
+if [ -z "$TIME_INPUT" ]; then
+  exit 0
+fi
+
+set -- $TIME_INPUT
+NUM="$1"
+UNIT="${2:-minutes}"
+
+if [ "$NUM" = "an" ]; then
+  NUM=1
+fi
+
+SECONDS=$(to_seconds "$NUM" "$UNIT")
+
+zenity --info --text="Will nag in $NUM $UNIT"
+
+(
+  sleep "$SECONDS"
+  espeak -v mb-en1 -s170 "$MESSAGE"
+) & disown $!

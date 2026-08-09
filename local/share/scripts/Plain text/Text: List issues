@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# install_keyboard_shortcut=<Control><Alt>W
+
+# Source the script '.common-functions.sh'.
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+ROOT_DIR=$(grep --only-matching "^.*scripts[^/]*" <<<"$SCRIPT_DIR")
+source "$ROOT_DIR/.common-functions.sh"
+
+_main() {
+    local input_files=""
+
+    # Execute initial checks.
+    _check_dependencies ""
+    _display_wait_box
+    input_files=$(_get_files "par_type=file; par_recursive=true; par_skip_encoding='binary'; par_skip_extension='pdf|svg'")
+
+    # Execute the function '_main_task' for each file in parallel.
+    _run_task_parallel "$input_files" ""
+
+    local std_output=""
+    std_output=$(_storage_text_read_all)
+    std_output=$(_text_sort "$std_output")
+
+    _display_list_box "$std_output" "par_item_name=$(_i18n 'files'); par_columns='--column:$(_i18n 'Issues'),--column:$(_i18n 'File')'; par_action=open_location; par_check_type=checkbox"
+}
+
+_main_task() {
+    local input_file=$1
+    local file_encoding=""
+    local hex_dump=""
+    local issues=""
+
+    file_encoding=$(_get_file_encoding "$input_file")
+    hex_dump=$(hexdump -v -e '/1 "%02X-" ' -- "$input_file")
+
+    # Checker: 'non UTF-8 encoding'.
+    if [[ "${file_encoding,,}" != *"us-ascii"* ]] &&
+        [[ "${file_encoding,,}" != *"utf-8"* ]]; then
+        issues+="[non UTF-8 encoding]"
+    fi
+
+    # Checker: 'UTF-8 with BOM'.
+    if [[ "${file_encoding,,}" == *"utf-8"* ]] &&
+        [[ "$hex_dump" == "EF-BB-BF-"* ]]; then
+        issues+="[UTF-8 with BOM]"
+    fi
+
+    # Checker: 'non-LF line break'.
+    if [[ "$hex_dump" == *"0D-"* ]]; then
+        issues+="[non-LF line break]"
+    fi
+
+    # Checker: 'trailing whitespace'.
+    if [[ "$hex_dump" == *"20-0A-"* ]] ||
+        [[ "$hex_dump" == *"20-0D-"* ]] ||
+        [[ "$hex_dump" == *"09-0A-"* ]] ||
+        [[ "$hex_dump" == *"09-0D-"* ]]; then
+        issues+="[trailing whitespace]"
+    fi
+
+    # Checker: 'mix tabs and spaces' (same line).
+    if [[ "$hex_dump" == *"20-09-"* ]] ||
+        [[ "$hex_dump" == *"09-20-"* ]]; then
+        issues+="[mix tabs and spaces]"
+    fi
+
+    # Checker: 'mix tabs and spaces' (different lines).
+    if [[ "$issues" != *"mix tabs and spaces"* ]]; then
+        if [[ "$hex_dump" == *"0D-20-"* ]] &&
+            [[ "$hex_dump" == *"0D-09-"* ]]; then
+            issues+="[mix tabs and spaces]"
+        fi
+    fi
+    if [[ "$issues" != *"mix tabs and spaces"* ]]; then
+        if [[ "$hex_dump" == *"0A-20-"* ]] &&
+            [[ "$hex_dump" == *"0A-09-"* ]]; then
+            issues+="[mix tabs and spaces]"
+        fi
+    fi
+
+    local eof=${hex_dump: -9}
+
+    # Checker: 'missing line at the end'.
+    if [[ "$eof" != *"0A-" ]] && [[ "$eof" != *"0D-" ]]; then
+        issues+="[missing line at the end]"
+    else
+        if [[ "$eof" == *"0D-0D-" ]] ||
+            [[ "$eof" == *"0A-0A-" ]] ||
+            [[ "$eof" == "0A-0D-0A-" ]]; then
+            # Checker: 'has many line breaks at the end'.
+            issues+="[extra lines at the end]"
+        fi
+    fi
+
+    # Save the result only for files with issues.
+    if [[ -n "$issues" ]]; then
+        _storage_text_write_ln "$issues$FIELD_SEPARATOR$(_text_remove_pwd "$input_file")"
+    fi
+}
+
+_main "$@"

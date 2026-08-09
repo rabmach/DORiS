@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Open a random file from /usr/include in nano at a random line.
+my_file=$(find /usr/include -type f 2>/dev/null | sort -R | head -n 1)
+[ -z "$my_file" ] && { echo "No files found in /usr/include" >&2; exit 1; }
+my_len=$(wc -l < "$my_file")
+[ "$my_len" -gt 0 ] || my_len=1
+exec nano "+$((RANDOM % my_len + 1))" "$my_file"

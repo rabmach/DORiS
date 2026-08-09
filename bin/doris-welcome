@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# 2026 machiner opencode
+### part of the DORiS suite of goodness - debian openbox restoration script(s) - 2026
+### doris-welcome - first-login welcome screen + browser setup menu.
+###
+### Launcher mode (no arg, from openbox autostart): opens a terminal that runs
+### this script in --run mode.
+###   --run  (inside that terminal)  shows the welcome text once, then an
+###          interactive browser-setup menu (via ~/bin/browsers-setup) until
+###          both Firefox and Helium are configured or the user skips.
+###
+### Safe to run by hand any time.
+set -Euo pipefail
+
+WELCOME="$HOME/.config/doris/welcome.txt"
+MARKER="$HOME/.config/doris/welcome-shown"
+DORIS_CONFIG="$HOME/.config/doris"
+FF_DONE="$DORIS_CONFIG/browsers-done-firefox"
+HE_DONE="$DORIS_CONFIG/browsers-done-helium"
+SELF="$(readlink -f "$0")"
+
+# ── launcher mode: open a real terminal that runs us in --run mode ──
+if [[ "${1:-}" != "--run" ]]; then
+    if command -v alacritty >/dev/null 2>&1; then
+        alacritty -e bash "$SELF" --run >/dev/null 2>&1 &
+    elif command -v xterm >/dev/null 2>&1; then
+        xterm -e bash "$SELF" --run >/dev/null 2>&1 &
+    elif command -v yad >/dev/null 2>&1; then
+        # no terminal to interact in; at least show the welcome text
+        [[ -f "$MARKER" ]] || [[ -s "$WELCOME" ]] \
+            && yad --text-info --filename="$WELCOME" --title="doris welcome" \
+                   --width=760 --height=560 >/dev/null 2>&1 &
+        touch "$MARKER"
+    else
+        cat "$WELCOME"
+    fi
+    exit 0
+fi
+
+# ── --run mode: interactive, running inside the terminal ──
+say() { printf '  %s\n' "$*"; }
+
+mkdir -p "$DORIS_CONFIG"
+if [[ ! -f "$MARKER" ]]; then
+    if [[ -s "$WELCOME" ]]; then
+        cat "$WELCOME"
+        echo
+        echo "  (press any key to continue)"
+        read -n1 -r -s _ || true
+        echo
+    fi
+    touch "$MARKER"
+fi
+
+# Browser setup menu until both are configured (or the user skips).
+if [[ ! -f "$FF_DONE" || ! -f "$HE_DONE" ]]; then
+    if command -v "$HOME/bin/browsers-setup" >/dev/null 2>&1 || [[ -x "$HOME/bin/browsers-setup" ]]; then
+        echo
+        echo "  A couple of one-time steps are left: browser privacy setup."
+        echo
+        while [[ ! -f "$FF_DONE" || ! -f "$HE_DONE" ]]; do
+            echo "  ------------------------------------------------------------"
+            echo "  Browser setup"
+            [[ -f "$FF_DONE" ]] || echo "    1) Set up Firefox"
+            [[ -f "$HE_DONE" ]] || echo "    2) Set up Helium"
+            echo "    3) Set up both (Firefox, then Helium)"
+            echo "    4) Skip for now (I'll ask again next login)"
+            echo
+            read -rp "  choice: " choice || true
+            case "${choice:-}" in
+                1) "$HOME/bin/browsers-setup" firefox ;;
+                2) "$HOME/bin/browsers-setup" helium ;;
+                3) "$HOME/bin/browsers-setup" both ;;
+                4|"") echo "  - skipped."; break ;;
+                *) echo "  ?? pick 1-4." ;;
+            esac
+        done
+    else
+        echo "  (browsers-setup not found at ~/bin - browser privacy setup skipped.)"
+    fi
+fi
+
+echo
+echo "  Done. Have a nice day."
+echo "  (close this window when you're done)"
+read -n1 -r -s _ || true
+exit 0

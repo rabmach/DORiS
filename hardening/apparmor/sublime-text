@@ -1,0 +1,52 @@
+# Sublime Text 4 confined profile.
+# Phase 1: loaded in COMPLAIN mode - logs what the app does, blocks nothing.
+# After ~1 week of use: sudo aa-logprof -p sublime_text, review, then
+#   sudo aa-enforce /etc/apparmor.d/sublime-text
+#
+# Design decisions for the enforce step (deliberate at that point):
+#  - Reads: no @{HOME} read is pre-granted, so every file you open is logged.
+#    At enforce time add the paths you actually edit (or @{HOME}/** r).
+#  - Network: denied by default - connection attempts (e.g. Package Control
+#    updates) are logged. Decide at enforce time whether to allow.
+#  - Sensitive dirs (~/.ssh, ~/.gnupg, ...) are NOT readable, so malicious
+#    plugins cannot exfiltrate keys. If you edit such files, add them.
+
+abi <abi/4.0>,
+include <tunables/global>
+
+profile sublime_text "/opt/sublime_text/sublime_text" flags=(complain) {
+  include <abstractions/base>
+  include <abstractions/X>
+  include <abstractions/wayland>
+  include <abstractions/dbus-session>
+  include <abstractions/fonts>
+  include <abstractions/gnome>
+  include <abstractions/ssl_certs>
+  include <abstractions/nss-systemd>
+  include <abstractions/xdg-open>
+  include <abstractions/audio>
+
+  # own binaries
+  /opt/sublime_text/** r,
+  /opt/sublime_text/{sublime_text,crash_handler,plugin_host-3.3,plugin_host-3.8} mrix,
+
+  # minimal capabilities
+  capability kill,
+  capability ipc_lock,
+
+  ptrace peer=@{profile_name},
+  signal peer=@{profile_name},
+
+  # IPC (X/wayland/dbus) - X/wayland/dbus abstractions grant their sockets
+  unix,
+
+  # user data - observe via logs what gets touched
+  owner @{HOME}/.config/sublime-text/** rw,
+  owner @{HOME}/.cache/sublime-text/** rwk,
+  owner /dev/shm/** rw,
+  owner /tmp/** rw,
+  owner /run/user/@{uid}/** rw,
+
+  # site-specific additions and overrides
+  include if exists <local/sublime_text>
+}

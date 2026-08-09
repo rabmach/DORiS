@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Reconfigure and restart Openbox (apply rc.xml/menu.xml changes).
+openbox --reconfigure && openbox --restart

@@ -1,0 +1,21 @@
+# DORiS - keep personal data out of git
+
+# secrets
+secrets/
+*.gpg
+*.key
+*.pem
+.env
+
+# runtime / machine-specific
+*.browsah-*
+*.bak-*
+*.log
+restore-errors.log
+restore.log
+backups/
+
+# editors / os
+*.swp
+*~
+.DS_Store

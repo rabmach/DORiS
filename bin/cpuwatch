@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Watch top memory consumers, refresh every second.
+exec watch -d -n 1 'ps -eo pid,ppid,cmd,%mem,%cpu --sort=-%mem | head'

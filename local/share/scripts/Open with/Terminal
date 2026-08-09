@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# install_keyboard_shortcut=F4
+
+# Source the script '.common-functions.sh'.
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+ROOT_DIR=$(grep --only-matching "^.*scripts[^/]*" <<<"$SCRIPT_DIR")
+source "$ROOT_DIR/.common-functions.sh"
+
+_main() {
+    local input_files=""
+
+    # Execute initial checks.
+    _check_dependencies ""
+    input_files=$(_get_files "par_type=directory; par_max_items=20")
+    _unset_global_variables_file_manager
+
+    # Run the main process.
+    _open_app "$input_files"
+}
+
+_open_app() {
+    local input_files=$1
+    local available_app=""
+    # shellcheck disable=SC2034
+    local apps=(
+        "ptyxis"
+        "gnome-terminal"
+        "kgx"
+        "konsole"
+        "xfce4-terminal"
+        "mate-terminal"
+        "xterm"
+        "kitty"
+        "alacritty"
+        "terminator"
+        "qterminal"
+        "deepin-terminal"
+        "terminology"
+        "uxterm"
+        "termit"
+        "foot"
+    )
+    available_app=$(_get_available_app "apps")
+
+    # Iterate over each input file (directory).
+    local input_file=""
+    for input_file in $input_files; do
+        # Detect if it's a remote 'sftp' path.
+        if [[ "$input_file" == *"sftp:"* ]]; then
+            local remote_host=""
+            local remote_path=""
+            if [[ "$input_file" =~ ^/run/user/[0-9]+/gvfs/sftp:host=([^/]+)(/.*)?$ ]]; then
+                # Case 1: GVFS mount format,
+                # such as: /run/user/.../gvfs/sftp:host=host/path.
+                remote_host="${BASH_REMATCH[1]}"
+                remote_path="${BASH_REMATCH[2]}"
+            elif [[ "$input_file" =~ ^sftp://([^/]+)/?(.*)$ ]]; then
+                # Case 2: URI format,
+                # such as: sftp://host/path.
+                remote_host="${BASH_REMATCH[1]}"
+                remote_path="/${BASH_REMATCH[2]}"
+            fi
+
+            # Build SSH command, with optional remote path.
+            local ssh_cmd="ssh -t $remote_host \"cd $remote_path/; exec bash\""
+            case "$available_app" in
+            gnome-terminal | mate-terminal)
+                $available_app -- bash -c "$ssh_cmd" &
+                ;;
+            ptyxis)
+                $available_app --new-window -- bash -c "$ssh_cmd" &
+                ;;
+            konsole | xfce4-terminal)
+                $available_app --hold -e "$ssh_cmd" &
+                ;;
+            kitty | foot | alacritty)
+                $available_app -e bash -c "$ssh_cmd" &
+                ;;
+            *)
+                # Generic fallback.
+                $available_app -e "$ssh_cmd" &
+                ;;
+            esac
+        else
+            # Local directory case.
+            if [[ "$available_app" == "ptyxis" ]]; then
+                $available_app --new-window --working-directory "$input_file" &
+            else
+                cd -- "$input_file" || continue
+                unset "OLDPWD"
+                $available_app &
+            fi
+        fi
+    done
+}
+
+_main "$@"

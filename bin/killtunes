@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Kill any running mpv music player.
+exec killall -9 mpv

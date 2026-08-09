@@ -1,0 +1,10 @@
+[Unit]
+Description=AppArmor observation review reminder timer
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+Unit=apparmor-review-reminder.service
+
+[Install]
+WantedBy=timers.target

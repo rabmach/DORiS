@@ -1,0 +1,14 @@
+user = YOUR_PANDORA_USER
+#@password = 
+#password_command = gpg --decrypt ~/passwd.gpg
+act_songlove = +
+act_songban = -
+act_quit = q
+act_stationchange = s
+act_songtired = t
+audio_quality = high
+#autostart_station = 2797568867144103202
+autostart_station = 147381918740051234
+event_command = /home/$USER/.config/pianobar/pianobar-notify.sh
+format_list_song = %i) %a - %t%r
+format_nowplaying_station = Station "%n" (%i)

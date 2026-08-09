@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Print a color test chart.
+exec sh ~/bin/color.sh

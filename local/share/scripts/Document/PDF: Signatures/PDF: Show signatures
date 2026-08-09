@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+# Source the script '.common-functions.sh'.
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+ROOT_DIR=$(grep --only-matching "^.*scripts[^/]*" <<<"$SCRIPT_DIR")
+source "$ROOT_DIR/.common-functions.sh"
+
+_main() {
+    local input_files=""
+
+    # Execute initial checks.
+    _check_dependencies "pdfinfo"
+    _display_wait_box
+    input_files=$(_get_files "par_type=file; par_recursive=true; par_select_extension=pdf")
+
+    # Execute the function '_main_task' for each file in parallel.
+    _run_task_parallel "$input_files" ""
+
+    local std_output=""
+    std_output=$(_storage_text_read_all)
+
+    # Translate some strings from the '$std_output'.
+    # shellcheck disable=SC2001
+    std_output=$(sed "s|__MSG_File__|$(_i18n 'File')|g" <<<"$std_output")
+
+    _display_text_box "$std_output"
+}
+
+_main_task() {
+    local input_file=$1
+    local std_output=""
+    local status="🔴"
+
+    # Run the main process.
+    std_output=$(LC_ALL=C pdfsig -- "$input_file" 2>/dev/null)
+
+    if [[ "$std_output" == *"Signature #"* ]]; then
+        # Remove irrelevant information.
+        std_output=$(grep --ignore-case -v "^Digital Signature Info of: " <<<"$std_output")
+
+        if grep --quiet --ignore-case "Signature is Valid" <<<"$std_output"; then
+            status="🟢"
+        fi
+
+        # Prepend the filename.
+        std_output="$status __MSG_File__: \"$(_text_remove_pwd "$input_file")\""$'\n'"$std_output"
+
+        _storage_text_write_ln "$std_output"$'\n'
+    fi
+}
+
+_main "$@"

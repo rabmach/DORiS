@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Record audio from the default ALSA input to a timestamped FLAC in the
+# current directory. Stop with Ctrl+C.
+exec sox -t alsa default "$(date +%Y-%m-%d-%I-%M-%S)-output.flac"

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Fetch the top-voted command-line one-liners from commandlinefu.
+exec curl "https://www.commandlinefu.com/commands/browse/sort-by-votes/plaintext"

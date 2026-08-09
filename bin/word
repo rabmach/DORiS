@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Open LibreOffice Writer.
+exec /usr/bin/lowriter

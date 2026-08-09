@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Speak a time-of-day greeting with the current time and mail status.
+hour=$(date +%H)
+if   [ "$hour" -lt 12 ]; then part="Good morning"
+elif [ "$hour" -lt 17 ]; then part="Good afternoon"
+elif [ "$hour" -lt 21 ]; then part="Good evening"
+else part="Good night"; fi
+
+name=$(getent passwd "${USER}" | cut -d ":" -f 5 | cut -d "," -f 1)
+[ -z "$name" ] && name="${USER}"
+
+time=$(date +"%I. %M. %p" | sed 's/AM/A. M./; s/PM/P. M./')
+
+mail=""
+grep -q "^To " "/var/mail/${USER}" 2>/dev/null && mail=" You have new messages."
+
+espeak -v mb-en1 -s170 "${part} ${name}! It is ${time}.${mail}"

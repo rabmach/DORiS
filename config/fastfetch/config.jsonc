@@ -1,0 +1,103 @@
+{
+    "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+   "logo": {
+    "padding": {
+      "top": 2,
+      "left": 1,
+      "right": 2
+    }
+  },
+    "display":
+    {
+        "separator": " -> "
+    },
+    "modules": [
+        "datetime",
+        "initsystem",
+        "loadavg",
+        "processes",
+        "memory",
+        "theme",
+        {
+            "type": "host",
+            "key": "󰌢 PC",
+            "keyColor": "green"
+        },
+        {
+            "type": "os",
+            "key": " OS",
+            "keyColor": "yellow",
+            "format": "{2}"
+        },
+        {
+            "type": "kernel",
+            "key": "├",
+            "keyColor": "yellow"
+        },
+        {
+            "type": "uptime",
+            "key": "└󰅐",
+            "keyColor": "green"
+        },
+        {
+            "type": "packages",
+            "key": "├󰏖",
+            "keyColor": "yellow"
+        },
+        {
+            "type": "wm",
+            "key": " DE/WM",
+            "keyColor": "blue"
+        },
+        {
+            "type": "wmtheme",
+            "key": "├󰉼",
+            "keyColor": "blue"
+        },
+        {
+            "type": "icons",
+            "key": "├󰀻",
+            "keyColor": "blue"
+        },
+        {
+            "type": "terminal",
+            "key": "├",
+            "keyColor": "blue"
+        },
+        {
+            "type": "shell",
+            "key": "└",
+            "keyColor": "yellow"
+        },
+        {
+            "type": "cpu",
+            "key": "├󰻠",
+            "keyColor": "green"
+        },
+        {
+            "type": "gpu",
+            "key": "├󰍛",
+            "keyColor": "red"
+        },
+        {
+            "type": "disk",
+            "key": "├",
+            "keyColor": "green"
+        },
+        {
+            "type": "sound",
+            "key": " SOUND",
+            "keyColor": "cyan"
+        },
+        {
+            "type": "player",
+            "key": "├󰥠",
+            "keyColor": "cyan"
+        },
+        {
+            "type": "media",
+            "key": "└󰝚",
+            "keyColor": "cyan"
+        },
+    ]
+}

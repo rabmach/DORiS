@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Helium launcher: disables Google's Optimization Guide (hint fetch + model
+# download) services. Passes all other args through, e.g. --password-store.
+exec /usr/bin/helium --disable-features=OptimizationGuideModelDownloads,OptimizationHints "$@"

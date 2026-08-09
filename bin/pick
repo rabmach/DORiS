@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Pick a random film from ~/films.txt.
+exec shuf -n 1 ~/films.txt

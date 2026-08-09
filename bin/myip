@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Show your public IPv4 address.
+curl -4 -s ifconfig.me
+echo

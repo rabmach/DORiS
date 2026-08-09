@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Generate a 32-char password, append to the gpg-encrypted password store, and show the file.
+STORE=~/secrets/new-bigass-passwords.txt
+if [[ ! -f "$STORE.gpg" ]] ; then
+  echo "no encrypted store at $STORE.gpg" >&2
+  exit 1
+fi
+RECIPIENT=$(gpg --batch --list-secret-keys --with-colons \
+    | awk -F: '$1=="sec" {print $5; exit}')
+if [[ -z "$RECIPIENT" ]] ; then
+  echo "no default gpg secret key - create one first (see README)" >&2
+  exit 1
+fi
+rm -f "$STORE"
+gpg --batch --quiet --decrypt -o "$STORE" "$STORE.gpg" || exit 1
+~/bin/mkpwd.sh 32 1 >> "$STORE"
+gpg --batch --yes --quiet --recipient "$RECIPIENT" --encrypt --output "$STORE.gpg" "$STORE" || exit 1
+shred -u "$STORE"
+gpg --batch --quiet --decrypt "$STORE.gpg"

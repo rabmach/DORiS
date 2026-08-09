@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Edit the bash aliases file.
+exec x-text-editor ~/.bash_aliases
