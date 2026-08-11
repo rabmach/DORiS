@@ -189,6 +189,7 @@ whois
 bc
 jq
 pwgen
+fbcat
 rsync
 unzip
 zip
