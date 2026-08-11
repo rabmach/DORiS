@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+dest="${HOME}/Pictures/ttysnaps"
+mkdir -p "$dest"
+
+for cmd in fbcat convert; do
+    command -v "$cmd" >/dev/null 2>&1 || {
+        echo "missing: $cmd (sudo apt install fbcat imagemagick)" >&2
+        exit 1
+    }
+done
+
+vt="$(tty)"
+case "$vt" in
+    /dev/tty[0-9]*) vt="${vt#/dev/tty}" ;;
+    *) echo "run from a text console (tty1-6), not: $vt" >&2; exit 1 ;;
+esac
+
+[[ -e /dev/fb0 ]] || { echo "no /dev/fb0; framebuffer console not active" >&2; exit 1; }
+
+base="${dest}/tt${vt}_$(date +%Y%m%d%H%M%S)"
+
+sudo fbcat > "${base}.ppm"
+convert "${base}.ppm" -quality 90 "${base}.jpg"
+rm -f "${base}.ppm"
+echo "saved ${base}.jpg"
