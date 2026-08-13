@@ -35,6 +35,18 @@ HE_DONE="$DORIS_DIR_CONFIG/browsers-done-helium"
 # One marker from the old pre-assistant flow; drop it so the menu re-offers.
 rm -f "$DORIS_DIR_CONFIG/browsers-done"
 
+# browser_alive <firefox|helium> - Debian's firefox ships as a launcher
+# binary named "firefox" that execv()s the real "firefox-bin"; pgrep -x
+# "firefox" alone never matches a running browser. Match the real comm names.
+browser_alive() {
+    case "$1" in
+        firefox) pgrep -x firefox    >/dev/null 2>&1 || \
+                 pgrep -x firefox-bin >/dev/null 2>&1 || \
+                 pgrep -x firefox-esr >/dev/null 2>&1 ;;
+        helium)  pgrep -x helium >/dev/null 2>&1 ;;
+    esac
+}
+
 # ── clear stale profile locks (Chromium/Firefox singleton files survive
 #    profile dumps and make the browser refuse to start, blaming a lock
 #    "on another computer"). Only safe when the browsers are not running.
@@ -42,8 +54,7 @@ clear_stale_locks() {
     local dir
     for dir in "$HOME/.config/net.imput.helium" "$HOME/.config/mozilla/firefox" "$HOME/.mozilla/firefox"; do
         [[ -d "$dir" ]] || continue
-        if pgrep -x helium >/dev/null 2>&1 || pgrep -x firefox >/dev/null 2>&1 \
-           || pgrep -x firefox-esr >/dev/null 2>&1; then
+        if browser_alive firefox || browser_alive helium; then
             echo "!! A browser is running - close it first, then rerun browsers-setup."
             return 1
         fi
@@ -88,13 +99,13 @@ ensure_profile() {
     local proc="$2" label="$3"
     shift 3
     if any_glob_ready "$globname"; then
-        if pgrep -x "$proc" >/dev/null 2>&1; then
+        if browser_alive "$proc"; then
             echo
             echo "  >>> $label is running <<<"
             echo "  Close it now, then press Enter. I will continue once it is closed."
             echo
             read -rp "  [Enter to continue] " _ || true
-            while pgrep -x "$proc" >/dev/null 2>&1; do
+            while browser_alive "$proc"; do
                 sleep 2
             done
             say "OK $label closed."
@@ -111,7 +122,7 @@ ensure_profile() {
     "$@" >/dev/null 2>&1 &
     local waited=0 seen=0
     while (( waited < 1200 )); do
-        if pgrep -x "$proc" >/dev/null 2>&1; then
+        if browser_alive "$proc"; then
             # browser is running; mark that we saw it. Only once it has been
             # running AND is now closed do we trust the profile glob.
             seen=1
