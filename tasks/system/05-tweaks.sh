@@ -18,11 +18,15 @@ source "$DORIS_DIR/lib.sh"
 header "SYSTEM TWEAKS"
 
 # ── 1. loginfetch: regenerate /etc/issue on every tty login ──
-if [[ -f "$HARDENING/loginfetch/loginfetch" ]]; then
-    write_root_file "$HARDENING/loginfetch/loginfetch" /usr/bin/loginfetch
+# BUG-002 fix: this referenced $HARDENING (undefined here - each task runs as
+# its own bash process; it's a local alias inside 05-hardening.sh only), so
+# set -u aborted the task with "unbound variable" (exit 1) and the banner was
+# never installed. Use the lib.sh-defined $HARDEN_DIR.
+if [[ -f "$HARDEN_DIR/loginfetch/loginfetch" ]]; then
+    write_root_file "$HARDEN_DIR/loginfetch/loginfetch" /usr/bin/loginfetch
     sudo chmod a+x /usr/bin/loginfetch
-    if [[ -f "$HARDENING/loginfetch/getty-override.conf" ]]; then
-        if write_root_file "$HARDENING/loginfetch/getty-override.conf" \
+    if [[ -f "$HARDEN_DIR/loginfetch/getty-override.conf" ]]; then
+        if write_root_file "$HARDEN_DIR/loginfetch/getty-override.conf" \
             /etc/systemd/system/getty@.service.d/override.conf; then
             sudo systemctl daemon-reload
         fi
