@@ -69,5 +69,22 @@ else
     log "All config icon/theme references point at system paths."
 fi
 
+# ── File-manager default (x-file-manager -> thunar) ─────────
+# BUG-007: this used to live in the per-user half as `sudo update-alternatives
+# --set`, but a plain ./user-setup.sh has no business needing root, and sudo
+# on a fresh install prompts for a password - so the win+f tweak silently
+# never applied there. The system-wide alternative belongs to the SYSTEM
+# half (we are root here); the per-user half only sets the inode/directory
+# handler for the individual user.
+if command -v thunar >/dev/null 2>&1; then
+    if sudo update-alternatives --set x-file-manager /usr/bin/thunar 2>/dev/null; then
+        log "x-file-manager alternative set -> thunar."
+    else
+        warn "update-alternatives x-file-manager failed (is thunar installed?)."
+    fi
+else
+    log "thunar not installed - x-file-manager alternative left as-is."
+fi
+
 log "Icons/themes installed system-wide."
 exit 0

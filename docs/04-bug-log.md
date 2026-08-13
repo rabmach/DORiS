@@ -13,6 +13,8 @@
 | **003** | failing tasks left no trace in the log | `run_tasks` never captured task output | fixed |
 | **004** | every fresh restore: "Mozilla key fingerprint MISMATCH" | kit pinned an outdated Mozilla key fingerprint | fixed |
 | **005** | plain `./user-setup.sh`: "Permission denied" flood | kit logs + backups/ left root-owned by the sudo system half | fixed |
+| **006** | welcome skipped straight into the browser menu | stale key in the tty queue answered "press any key" (or empty welcome.txt skipped the gate) | fixed |
+| **007** | win+f never opened thunar, silently | the per-user half called `sudo update-alternatives` (needs a password on fresh installs) | fixed |
 
 ---
 
@@ -136,6 +138,60 @@ were even inconsistent — this bug is why.
 backups only — never the scripts themselves, which a user-owned kit already
 owns). On a box already mid-restore, one
 `sudo chown -R user:user ~/DORiS` heals kit state retroactively.
+
+---
+
+## BUG-006 — the welcome skipped straight into the browser menu
+
+**Symptom (2026-08-13, the 8440's re-test):** on first login the welcome text
+was gone and `doris-welcome` landed directly in the browser-setup menu — no
+"press any key" hand-off, even though the same welcome had worked on the
+previous install.
+
+**Root cause (two layers):**
+1. **Stale-key race.** `doris-welcome` runs in a terminal that Openbox launches
+   at login. Keys the user types while the desktop/terminal is still starting
+   sit in the tty input queue; when the script finally runs `read -n1`, it
+   answers the "press any key" gate *instantly* with that old key — the queue
+   doesn't care what the screen showed first. It "worked last time" because a
+   race only fires when you hit the timing.
+2. **Empty welcome text.** If `welcome.txt` came out empty, `[[ -s "$WELCOME" ]]`
+   skipped the gate **entirely** — there was no hand-off to miss at all.
+
+**Fix:**
+- New `drain_input()` in `doris-welcome` — a non-blocking `read` loop that
+  empties the tty queue *before* every interactive read, so only keys typed
+  after the prompt is visible count.
+- The gate now always runs when the marker is absent, showing a placeholder
+  line instead of silently diving into the browser menu if `welcome.txt` is
+  empty.
+
+**Cost / note:** draining can't distinguish "typed during startup" from
+"typed after the prompt" — it just resets the window to zero at each prompt.
+That's the honest fix for a fundamentally racy interaction.
+
+---
+
+## BUG-007 — win+f never opened thunar, silently
+
+**Symptom (2026-08-13, the 8440):** the `win+f` → thunar tweak was still not
+applied after a plain `./user-setup.sh`, and no error appeared in
+`restore-errors.log` (the plain run couldn't write the root-owned errors file
+either — see BUG-005).
+
+**Root cause:** task 10 ran `sudo update-alternatives --set x-file-manager
+/usr/bin/thunar`. On a fresh net-install sudo prompts for a **password**; a
+plain user half has no business calling it, the prompt is easy to miss, and
+the failure was swallowed.
+
+**Fix:** the system-wide alternative moved to task 04 (`04-assets.sh`) where
+the system half is already root. The per-user half now only sets the
+per-user `inode/directory` handler (`xdg-mime`, no sudo). Per-user setup no
+longer needs root for this — the architectural rule: *system-wide → system
+half; user-level → user half.*
+
+**Cost / note:** a machine whose system half hasn't run (or re-ran) won't have
+the alternative — that's correct: the user half shouldn't be doing root work.
 
 ---
 
