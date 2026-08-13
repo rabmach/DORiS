@@ -74,6 +74,23 @@ fi
 # invocation with "mkdir: Permission denied" all over.
 settle_ownership
 
+# ── Plain-user resilience (no sudo) ──────────────────────
+# Without root, the kit's logs may still be root-owned from a sudo restore
+# (restore.sh truncates restore.log as root and backups/ is created as root).
+# Don't flood stderr with tee failures - fall back to a writable log in the
+# home, and give a single clear message if the home itself isn't writable
+# instead of a wall of mkdir errors.
+if [[ "$(id -u)" -ne 0 ]]; then
+    if [[ ! -w "$LOG_FILE" ]]; then
+        export LOG_FILE="$HOME/.doris-user-setup.log"
+        export ERROR_FILE="$HOME/.doris-user-setup-errors.log"
+        warn "Kit logs not writable by $CURRENT_USER - logging to \$HOME/.doris-user-setup*.log instead."
+    fi
+    if [[ ! -w "$CURRENT_HOME" ]]; then
+        die "$CURRENT_HOME is not writable by $CURRENT_USER - run once with:  sudo $0"
+    fi
+fi
+
 cat << "EOF"
 
   DORiS - per-user setup

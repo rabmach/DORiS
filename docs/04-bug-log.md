@@ -12,6 +12,7 @@
 | **002** | system half: `05-tweaks FAILED (exit 1)`, loginfetch banner never installed | undefined `$HARDENING` → `set -u` abort | fixed |
 | **003** | failing tasks left no trace in the log | `run_tasks` never captured task output | fixed |
 | **004** | every fresh restore: "Mozilla key fingerprint MISMATCH" | kit pinned an outdated Mozilla key fingerprint | fixed |
+| **005** | plain `./user-setup.sh`: "Permission denied" flood | kit logs + backups/ left root-owned by the sudo system half | fixed |
 
 ---
 
@@ -102,6 +103,39 @@ along, the pin was the lie.
 **Note:** the "install anyway on mismatch" behavior is deliberate — a flaky
 keyserver must not brick a whole restore (02-repos documents this). With the
 pin corrected, a real mismatch still warns loudly.
+
+---
+
+## BUG-005 — plain-user `user-setup.sh`: the kit's own state was root-owned
+
+**Symptom (2026-08-13, the 8440's re-test with the fixed kit):** the system
+half (`sudo ./restore.sh`) ran clean, then the documented plain run
+`./user-setup.sh` flooded the terminal with "Permission denied" — even though
+the home itself was owned correctly.
+
+**Root cause:** `restore.sh` truncates `restore.log`/`restore-errors.log`
+**as root** and the system tasks create `backups/` **as root**, all inside the
+kit directory. A subsequent *plain-user* per-user run then could not write any
+of them: every `log()` line is `tee -a restore.log` (`lib.sh:44`) → "tee:
+Permission denied" on every message, and `backup_and_copy` → `mkdir
+backups/<ts>/…` → "Permission denied" on every backup. `settle_ownership` is a
+no-op when not root, so it couldn't help. The two documented invocations
+(`./user-setup.sh` in the VM walkthrough, `sudo ./user-setup.sh` in the table)
+were even inconsistent — this bug is why.
+
+**Fix (two layers):**
+- `restore.sh`: after truncating the logs, `chown` `restore.log`,
+  `restore-errors.log` and the `backups/` parent to the invoking user, so a
+  plain per-user run finds its own state.
+- `user-setup.sh`: when run without root and the kit's log isn't writable,
+  fall back to `~/.doris-user-setup.log` instead of flooding stderr; and if
+  the home itself isn't writable, die with one clear "run once with sudo"
+  message instead of a wall of `mkdir` errors.
+
+**Cost / note:** chowning the kit's state files to the user is safe (logs and
+backups only — never the scripts themselves, which a user-owned kit already
+owns). On a box already mid-restore, one
+`sudo chown -R user:user ~/DORiS` heals kit state retroactively.
 
 ---
 

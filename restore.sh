@@ -100,6 +100,16 @@ rm -f "$ERROR_FILE"
 : > "$LOG_FILE"
 : > "$ERROR_FILE"
 
+# Hand the kit's state files back to the target user. A subsequent per-user
+# run WITHOUT sudo appends to these logs and creates backups under backups/;
+# if a root restore leaves them root-owned, that run floods with "Permission
+# denied" on every log line and every backup (the 8440's first re-test).
+if [[ -n "$CURRENT_USER" && "$CURRENT_USER" != "root" ]]; then
+    chown "$CURRENT_USER" "$LOG_FILE" "$ERROR_FILE" 2>/dev/null || true
+    mkdir -p "$BACKUP_BASE" 2>/dev/null || true
+    chown "$CURRENT_USER" "$BACKUP_BASE" 2>/dev/null || true
+fi
+
 log "Starting DORiS system restoration..."
 log "User: $CURRENT_USER  Home: $CURRENT_HOME  Date: $(date)"
 [[ "$DRY_RUN" == true ]] && info "DRY RUN MODE - No changes will be made"
