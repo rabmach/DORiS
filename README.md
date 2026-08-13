@@ -10,13 +10,13 @@ needs is `apt`. Two browsers, configured and hardened for you, of course.
 Menus, keys, firewall, welcome screen. It's a whole 'nother level, right in
 your pocket.
 
-![The doris desktop](docs/images/desktop.png)
+![The doris desktop](docs/images/desktop.jpg)
 *The doris desktop — Openbox, keyboard-driven, tiled, tint2 panel.*
 
-![First-login welcome](docs/images/welcome.png)
+![First-login welcome](docs/images/welcome.jpg)
 *First-login welcome — generated from the kit itself, so it never rots.*
 
-![Browser setup assistant](docs/images/browsers.png)
+![Browser setup assistant](docs/images/browsers.jpg)
 *The browser assistant — walks you through Firefox + Helium hardening and add-ons.*
 
 ## Why DORiS
