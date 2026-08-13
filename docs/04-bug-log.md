@@ -17,6 +17,7 @@
 | **007** | win+f never opened thunar, silently | the per-user half called `sudo update-alternatives` (needs a password on fresh installs) | fixed |
 | **008** | browser assistant: "profile detected" before any first-run happened | `profiles.ini` is written at browser spawn, so the wait loop matched it immediately | fixed |
 | **009** | fresh restore: `auditd failed to start`, 06-verify "auditd is active" FAILED | `write_root_file` used `cp -a`, which preserved the git-checkout *owner* onto `/etc` files → auditd refuses non-root-owned config; `loginfetch` became a root-run binary owned by the checkout user (privesc smell) | fixed |
+| **010** | fresh-profile browser setup hung: Firefox launched, first-run done, browser closed, assistant never continued | Debian's `firefox` is a launcher ELF that `execv()`s `firefox-bin`; the watcher's `pgrep -x firefox` can never match, so the profile was never accepted and the loop ran its full 20-min timeout | fixed |
 
 ---
 
@@ -257,6 +258,42 @@ privilege-escalation vector. The user half was already fine (it copies into
 `~`, user-owned anyway).
 
 ---
+
+---
+
+## BUG-010 — browser wait loop never matched a running Firefox
+
+**Symptom (2026-08-13, live-box test user `doris`):** the browser assistant
+launched Firefox for its first run, the first-run wizard was completed, the
+browser was closed — and the assistant never continued. No message, just a
+hang. Re-launching and closing Firefox again didn't help. Ctrl-C killed it.
+On the next login the menu option was picked again and it sailed through —
+because by then the profile already existed, so the wait loop was never
+entered.
+
+**Root cause:** Debian's firefox package ships a tiny launcher ELF
+(`/usr/lib/firefox/firefox`, the thing `/usr/bin/firefox` symlinks to) that
+`execv()`s the real binary `/usr/lib/firefox/firefox-bin`. The running
+process is therefore *named* `firefox-bin`, never `firefox`. The watcher
+looped on `pgrep -x firefox`, which can never match, so `seen` stayed 0 and
+the `elif (( seen )) && any_glob_ready` exit condition could never fire. The
+loop then ran its full 1200-second budget and timed out — the "hang".
+
+**Fix (browsers/post-login.sh):** a `browser_alive()` helper that matches
+`firefox`, `firefox-bin`, and `firefox-esr` (the launcher execs the bin; ESR
+ships that name directly; the plain name is what the wrapper is called in
+some installs). It is now used for every process check: the first-run wait
+loop, the already-running branch, `clear_stale_locks`, and
+configure-firefox.sh's "close it first" guard. The stale-lock deletion
+otherwise had the *reverse* danger: it would delete Firefox's SingletonLock
+files while Firefox was actually running.
+
+**Cost / note:** helium is unaffected — its main process really is named
+`helium`. Verified live: `browser_alive firefox` returns true while
+firefox-bin runs, false after close.
+
+*Filed 2026-08-13 from a first-run walk-through of the browser assistant on
+a live test user — the closest thing to a fresh install short of one.*
 
 *Filed 2026-08-13 from the first machine-agnostic fresh-install test (the
 8440). The net-install that found these was worth it: this is the only test
