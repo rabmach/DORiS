@@ -15,6 +15,7 @@
 | **005** | plain `./user-setup.sh`: "Permission denied" flood | kit logs + backups/ left root-owned by the sudo system half | fixed |
 | **006** | welcome skipped straight into the browser menu | stale key in the tty queue answered "press any key" (or empty welcome.txt skipped the gate) | fixed |
 | **007** | win+f never opened thunar, silently | the per-user half called `sudo update-alternatives` (needs a password on fresh installs) | fixed |
+| **008** | browser assistant: "profile detected" before any first-run happened | `profiles.ini` is written at browser spawn, so the wait loop matched it immediately | fixed |
 
 ---
 
@@ -192,6 +193,33 @@ half; user-level → user half.*
 
 **Cost / note:** a machine whose system half hasn't run (or re-ran) won't have
 the alternative — that's correct: the user half shouldn't be doing root work.
+
+---
+
+## BUG-008 — browser assistant "detected" a profile that didn't exist yet
+
+**Symptom (2026-08-13, the 8440):** in the browser assistant, hitting "1) Set
+up Firefox" launched Firefox and ~1 second later declared *"Firefox profile
+detected"* — before the user had gone through the first-run wizard. It then
+ran the config and opened the first extension page, which landed
+simultaneously with Firefox's own first-run setup.
+
+**Root cause:** `ensure_profile`'s wait loop checked `pgrep` first, then fell
+through to "profile exists?" — and `FF_GLOB` matched **`profiles.ini`**, which
+Firefox writes at *spawn time*, before the profile is initialized. On the
+first loop iteration the just-spawned process wasn't visible to `pgrep` yet,
+so the `elif` matched instantly. `profiles.ini` was never a "real profile"
+signal.
+
+**Fix (browsers/post-login.sh):**
+- `FF_GLOB` now matches the initialized profile's **`prefs.js`** (written only
+  when the profile is actually created), not `profiles.ini`.
+- The wait loop only accepts "profile detected" after the browser has been
+  **seen running** (`seen=1`) **and** is now closed — so a spurious glob match
+  during the spawn window can't fire early.
+
+**Cost / note:** a profile dump (from the user's live box) contains `prefs.js`,
+so restore-dump flows still take the "profile exists" shortcut as designed.
 
 ---
 
