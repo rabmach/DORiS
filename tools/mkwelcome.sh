@@ -108,7 +108,7 @@ echo "  BROWSERS (first login opens the setup menu):"
 echo "   * the welcome terminal offers Firefox / Helium / both. The assistant"
 echo "     LAUNCHES each browser for you, waits for the first run, then applies"
 echo "     the privacy config and walks you through the add-ons."
-echo "   * Only the KeePassXC extension is offered for Helium."
+echo "   * uBlock Origin is built into Helium; the kit offers no Helium add-ons."
 
 # ── keybinds ─────────────────────────────────────────────────
 echo
