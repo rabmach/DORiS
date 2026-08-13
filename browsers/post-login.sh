@@ -109,11 +109,13 @@ ensure_profile() {
     echo "  then CLOSE it. I am watching the profile and will continue..."
     echo
     "$@" >/dev/null 2>&1 &
-    local waited=0
+    local waited=0 seen=0
     while (( waited < 1200 )); do
         if pgrep -x "$proc" >/dev/null 2>&1; then
-            :  # browser still open; keep waiting for the user to close it
-        elif any_glob_ready "$globname"; then
+            # browser is running; mark that we saw it. Only once it has been
+            # running AND is now closed do we trust the profile glob.
+            seen=1
+        elif (( seen )) && any_glob_ready "$globname"; then
             sleep 1
             say "OK $label profile detected."
             return 0
@@ -157,7 +159,10 @@ do_helium() {
     fi
 }
 
-FF_GLOB=("$HOME/.config/mozilla/firefox/profiles.ini" "$HOME/.mozilla/firefox/profiles.ini")
+# BUG-008: profiles.ini is written by the browser at SPAWN time, long before
+# the first-run wizard finishes - so it is not a "real profile" signal. A
+# profile with prefs.js is initialized (first-run done). Match that instead.
+FF_GLOB=("$HOME/.config/mozilla/firefox/*/prefs.js" "$HOME/.mozilla/firefox/*/prefs.js")
 HE_GLOB=("$HOME/.config/net.imput.helium/Default/Preferences")
 
 run_menu() {
