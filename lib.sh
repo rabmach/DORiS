@@ -215,6 +215,7 @@ settle_ownership() {
 write_root_file() {
     local src="$1" dest="$2"
     if [[ -e "$dest" ]] && sudo cmp -s "$src" "$dest"; then
+        sudo chown root:root "$dest"
         log "  Already in place: $dest"
         return 1
     fi
