@@ -64,7 +64,10 @@ if [ ! -d "$PROFILE" ]; then
   exit 1
 fi
 
-if pgrep -x firefox >/dev/null 2>&1 || pgrep -x firefox-esr >/dev/null 2>&1; then
+# Debian's firefox package execs the real binary as "firefox-bin"; match
+# every name a running Firefox can carry (launcher, real binary, ESR).
+if pgrep -x firefox >/dev/null 2>&1 || pgrep -x firefox-bin >/dev/null 2>&1 \
+   || pgrep -x firefox-esr >/dev/null 2>&1; then
   echo "!! Firefox is running. Close it first, then rerun this."
   exit 1
 fi
