@@ -161,6 +161,21 @@ file, so a second user — or a re-run — is safe.
 | 11-browsers | stages browsah → `~/browsah`, installs the **assistant** `~/bin/browsers-setup` (the welcome menu drives first-login setup) |
 | 12-welcome | generates the first-login welcome from the kit (keybinds, aliases, timers, admin apps, credential nags, dad joke), then offers the browser setup menu; arms the AppArmor review timer |
 
+## Applying updates
+
+`git pull` only downloads the new scripts — it changes nothing on your box.
+To apply a kit update, re-run the half that owns the changed task:
+
+* system-level changes (`tasks/system/*`, e.g. `update-alternatives`,
+  nftables, sysctl, packages) → `sudo ./restore.sh`
+* user-level changes (`tasks/user/*`, `config/`, `bin/`, `browsers/`) →
+  `./user-setup.sh`
+
+Both halves are idempotent: backups go to `<kit>/backups/` first, already-
+done steps are skipped, and nothing is re-downloaded. If in doubt, run the
+system half too — it re-verifies what matters (task 06) rather than
+clobbering anything.
+
 ## Security
 
 Two postures, decided automatically at runtime:
