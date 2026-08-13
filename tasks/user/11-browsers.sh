@@ -55,7 +55,7 @@ echo "    * the assistant LAUNCHES each browser for you, waits for you to"
 echo "      finish the first run and close it, then applies the privacy config"
 echo "    * it then opens each add-on page and watches until you install it"
 echo "  You can also run it manually any time:   browsers-setup"
-echo "  Only the KeePassXC extension is offered for Helium."
+echo "  uBlock Origin is built into Helium; the kit offers no extensions."
 echo
 
 log "Browsah staging complete."

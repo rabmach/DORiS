@@ -198,13 +198,14 @@ changes (`cp -a` copies, nothing is deleted until you are happy).
 At first login the welcome screen offers a browser setup menu (Firefox /
 Helium / both). The assistant (`browsers-setup`) launches each browser for
 you, waits for you to finish the first run and close it, then applies the
-browsah privacy configs (user.js, DDG, DoH secure, services off, ramdisk
+browsah privacy configs (user.js, DDG, DoH secure, GTK theme, ramdisk
 cache) and opens the add-on pages one at a time — watching the profile
 until each extension actually installs. Per-browser done markers
 (`~/.config/doris/browsers-done-firefox`, `-helium`) let you step through
-them one at a time; it never re-asks about what's already installed. Only
-the KeePassXC extension is offered for Helium — ClearURLs and SponsorBlock
-have no Helium build.
+them one at a time; it never re-asks about what's already installed. For
+Helium, uBlock Origin is built in — the kit offers no Helium extensions
+(KeePassXC-Browser is left for you to add from the Web Store if you want
+it; Helium services stay enabled so the extension proxy works).
 
 ## Welcome screen
 

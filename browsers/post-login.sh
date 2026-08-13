@@ -5,8 +5,8 @@
 ###
 ### Runs from your X session (startx / display manager). Pick a browser from
 ### the menu; it launches the browser for you, waits for your first run, then
-### applies the browsah privacy configs (user.js, DDG, DoH secure, services
-### off, ramdisk cache) and walks you through the extension installs, watching
+### applies the browsah privacy configs (user.js, DDG, DoH secure, GTK theme,
+### ramdisk cache) and walks you through the extension installs, watching
 ### the profile until each one lands.
 ###
 ###   usage: browsers-setup [firefox|helium|both]   (no arg -> menu)
