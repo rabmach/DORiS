@@ -16,6 +16,7 @@
 | **006** | welcome skipped straight into the browser menu | stale key in the tty queue answered "press any key" (or empty welcome.txt skipped the gate) | fixed |
 | **007** | win+f never opened thunar, silently | the per-user half called `sudo update-alternatives` (needs a password on fresh installs) | fixed |
 | **008** | browser assistant: "profile detected" before any first-run happened | `profiles.ini` is written at browser spawn, so the wait loop matched it immediately | fixed |
+| **009** | fresh restore: `auditd failed to start`, 06-verify "auditd is active" FAILED | `write_root_file` used `cp -a`, which preserved the git-checkout *owner* onto `/etc` files → auditd refuses non-root-owned config; `loginfetch` became a root-run binary owned by the checkout user (privesc smell) | fixed |
 
 ---
 
@@ -220,6 +221,40 @@ signal.
 
 **Cost / note:** a profile dump (from the user's live box) contains `prefs.js`,
 so restore-dump flows still take the "profile exists" shortcut as designed.
+
+---
+
+## BUG-009 — `cp -a` in write_root_file copied the checkout owner onto /etc
+
+**Symptom (2026-08-13, the 8440):** `05-hardening` logged `auditd failed to
+start.`, and 06-verify failed its `auditd is active` check (the restore's only
+error). `journalctl -u auditd` said it plainly: *`/etc/audit/auditd.conf isn't
+owned by root`*.
+
+**Root cause:** `write_root_file()` in lib.sh copied kit files into `/etc`
+with `sudo cp -a`. `cp -a` = `--preserve=all`, which keeps the **source
+ownership** — and the source lives in `~/DORiS`, checked out by the *user*.
+So every system file the kit dropped in place (`auditd.conf`, `nftables.conf`,
+AppArmor profiles, sysctl drop-ins, cron, stubby, systemd units, and
+`/usr/bin/loginfetch`) was owned by the checkout user, not root.
+
+Auditd is the one daemon that *enforces* root ownership of its config — it
+aborts on any other owner (a deliberate anti-privesc measure). That explains
+the whole arc: mid-restore the daemon was already running from package install
+(old root-owned config still in memory) so `systemctl enable --now` reported
+success; after reboot auditd read the freshly-copied user-owned config and
+refused. The earlier "audit.service failing at boot" report was blamed on the
+dying drive — it was this bug all along.
+
+**Fix (lib.sh):** after the copy, `sudo chown root:root "$dest"`. One line in
+the one choke-point that writes system files.
+
+**Cost / note:** forcing root:root is correct for every `write_root_file`
+caller (they're all system paths). Beyond the auditd failure this closed a
+real security smell: `loginfetch` runs as **root** at every tty login, and a
+root-run `/usr/bin` binary owned by a normal user is a trivial local
+privilege-escalation vector. The user half was already fine (it copies into
+`~`, user-owned anyway).
 
 ---
 
