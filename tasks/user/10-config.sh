@@ -105,26 +105,19 @@ fi
 command -v xdg-user-dirs-update &>/dev/null && xdg-user-dirs-update 2>/dev/null || true
 
 # ── File-manager default (thunar owns x-file-manager + inode/directory) ─
-# BUG-001: this used to swallow failures with `|| true`, so the x-file-manager
-# tweak silently never applied on fresh installs (run-as-user xdg-mime hit a
-# root-owned ~/.config before the end-of-task chown). Failures are now logged.
+# BUG-007: the SYSTEM-wide x-file-manager alternative is set by task 04
+# (root). Here we only set the per-user inode/directory handler - no sudo, so
+# a plain ./user-setup.sh works without a password prompt. Failures log.
 if command -v thunar >/dev/null 2>&1; then
-    FM_OK=1
     if [[ "$(id -u)" -eq 0 ]]; then
-        update-alternatives --set x-file-manager /usr/bin/thunar 2>/dev/null \
-            || FM_OK=0
         runuser -u "$CURRENT_USER" -- xdg-mime default thunar.desktop \
-            inode/directory 2>/dev/null || FM_OK=0
+            inode/directory 2>/dev/null \
+            || warn "  xdg-mime default failed for $CURRENT_USER (non-fatal)."
     else
-        sudo update-alternatives --set x-file-manager /usr/bin/thunar 2>/dev/null \
-            || FM_OK=0
-        xdg-mime default thunar.desktop inode/directory 2>/dev/null || FM_OK=0
+        xdg-mime default thunar.desktop inode/directory 2>/dev/null \
+            || warn "  xdg-mime default failed (non-fatal)."
     fi
-    if [[ "$FM_OK" -eq 1 ]]; then
-        log "  thunar set as file manager (x-file-manager + inode/directory)."
-    else
-        warn "  file-manager default (thunar) partially failed - re-run task 10 as root after fixing ownership."
-    fi
+    log "  inode/directory handler set to thunar for $CURRENT_USER."
 else
     warn "  thunar not found - skipping file-manager default."
 fi
