@@ -188,6 +188,26 @@ own_as_user() {
     done
 }
 
+# Settle $CURRENT_HOME ownership to $CURRENT_USER BEFORE any task runs.
+# user-setup.sh may be invoked via sudo (files land root-owned) or by the
+# user themselves (and the home may be root-owned from a botched run or a
+# previous install). Doing this up front is what makes run-as-user steps
+# (e.g. xdg-mime in task 10) actually succeed - the old code only chowned at
+# the END of each task, so fresh installs spewed "mkdir: Permission denied"
+# and the thunar/x-file-manager tweak silently never applied.
+# This mirrors the manual `sudo chown -R user:user /home/user` fix. No-op
+# unless we are root (a plain-user run is already correct after settle).
+settle_ownership() {
+    [[ "$(id -u)" -eq 0 ]] || return 0
+    [[ -n "$CURRENT_USER" && "$CURRENT_USER" != "root" ]] || return 0
+    if [[ ! -d "$CURRENT_HOME" ]]; then
+        mkdir -p "$CURRENT_HOME"
+        chown "$CURRENT_USER":"$CURRENT_USER" "$CURRENT_HOME"
+    fi
+    chown -R "$CURRENT_USER":"$CURRENT_USER" "$CURRENT_HOME" 2>/dev/null || true
+    log "  Ownership of $CURRENT_HOME settled to $CURRENT_USER."
+}
+
 # ── Root-owned file helper ───────────────────────────────────
 # Writes a file as root, backing up any existing target first.
 # Idempotent: if the target is already byte-identical it is left
@@ -378,7 +398,12 @@ run_tasks() {
             esac
         fi
 
-        if bash "$task"; then
+        # Capture task output live into the log. A failing task must leave a
+        # trail - without this, an exit-1 task was invisible in restore.log
+        # (the 8440's "system half ran flawlessly" was wrong: 05-tweaks had
+        # died on an unbound variable). pipefail (set in the runners) keeps
+        # the pipeline's exit code equal to the task's.
+        if bash "$task" 2>&1 | tee -a "$LOG_FILE"; then
             log "  TASK $task_name completed successfully."
             ((PASSED++))
         else

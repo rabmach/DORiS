@@ -63,7 +63,7 @@ if [[ ! -f /etc/apt/sources.list.d/mozilla.list ]]; then
     add_apt_key \
         "https://packages.mozilla.org/apt/repo-signing-key.gpg" \
         "/etc/apt/keyrings/packages.mozilla.org.asc" \
-        "35BAA0B33E9EB396F59CA838C0BA5CE3537168ED1" "Mozilla"
+        "35BAA0B33E9EB396F59CA838C0BA5CE6DC6315A3" "Mozilla"
     echo "deb [signed-by=/etc/apt/keyrings/packages.mozilla.org.asc] https://packages.mozilla.org/apt mozilla main" \
         | sudo tee /etc/apt/sources.list.d/mozilla.list > /dev/null
     log "Mozilla repository added."

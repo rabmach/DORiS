@@ -67,6 +67,13 @@ if [[ "$(id -u)" -eq 0 && "$CURRENT_USER" == "root" ]]; then
     die "No target user. Run as your user, or use:  sudo $0 --user <name>"
 fi
 
+# Fresh-install fix: the home must be owned by the target user before any
+# task runs (see BUG-001 in docs/04-bug-log.md). Via sudo, everything below
+# would otherwise land root-owned until each task's end-of-run chown - too
+# late for the run-as-user steps, and a root-owned home breaks a plain-user
+# invocation with "mkdir: Permission denied" all over.
+settle_ownership
+
 cat << "EOF"
 
    ____                          ____    ____  ___
