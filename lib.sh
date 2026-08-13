@@ -221,6 +221,7 @@ write_root_file() {
     backup_file "$dest"
     sudo mkdir -p "$(dirname "$dest")"
     sudo cp -a "$src" "$dest"
+    sudo chown root:root "$dest"
     log "  Wrote: $dest"
     return 0
 }
