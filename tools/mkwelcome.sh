@@ -32,7 +32,7 @@ modifier() { # C->Ctrl A->Alt S->Shift W->Super, joined with +
 }
 
 # ── title ────────────────────────────────────────────────────
-echo "     welcome back to your doris desktop.     "
+echo "     welcome back to your DORiS desktop.     "
 echo "  ----------------------------------------------------------"
 
 # ── security ─────────────────────────────────────────────────
