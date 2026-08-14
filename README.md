@@ -1,6 +1,6 @@
 # DORiS — Debian Openbox Restoration Script
 
-One stick. One button. Hardened, configured, bespoke desktop. Off-line. ka-BAM.
+One stick. One button. Hardened, configured, wicked desktop. Off-line. Run and done.
 
 DORiS is a desktop restoration system for **any amd64 machine** running Debian
 trixie. Run it after a fresh net-install and it recreates the doris desktop —
@@ -11,21 +11,19 @@ Menus, keys, firewall, welcome screen. It's a whole 'nother level, right in
 your pocket.
 
 ![The doris desktop](docs/images/desktop.jpg)
-*The doris desktop — Openbox, keyboard-driven, tiled, tint2 panel.*
+*The doris desktop — Openbox, keyboard-driven...colorful.*
 
 ![First-login welcome](docs/images/welcome.jpg)
 *First-login welcome — generated from the kit itself, so it never rots.*
 
 ![Browser setup assistant](docs/images/browsers.jpg)
-*The browser assistant — walks you through Firefox + Helium hardening and add-ons.*
+*The browser assistant — walks you through Firefox + Helium setup with hardened profiles.*
 
 ## Why DORiS
 
-Not tutorials. Not ten-minute videos. Decades of working on commodity hardware —
-a real machine, doing real work, every day — distilled into one kit. DORiS is a
-disposition: a humanist's way of computing, where the machine bends to how you
+DORiS is a disposition: a humanist's way of computing, where the machine bends to how you
 think, not the other way around. The hundred hours of "how I like my box"
-finally written down, so a fresh install comes out the other side already home.
+written down, so a fresh install comes out the other side already home.
 
 Everything you need is at the ready — a keybind or a handy alias or a script
 away. All your keys work before you even learn they exist. Everything works
@@ -98,12 +96,12 @@ watch the kit work end to end.
 
 3. Get the kit onto the machine either way:
 
-   **cloned repo (subsequent runs):**
+   **cloned repo:**
    ```sh
    git clone https://github.com/rabmach/DORiS ~/DORiS
    cd ~/DORiS
    ```
-   **backup drive (first run):**
+   **backup drive:**
    ```sh
    sudo mount /dev/<backupdrive> /mnt
    cd /mnt/DORiS
@@ -174,7 +172,7 @@ To apply a kit update, re-run the half that owns the changed task:
 Both halves are idempotent: backups go to `<kit>/backups/` first, already-
 done steps are skipped, and nothing is re-downloaded. If in doubt, run the
 system half too — it re-verifies what matters (task 06) rather than
-clobbering anything.
+wrecking anything.
 
 ## Security
 
@@ -287,7 +285,7 @@ resolve `$HOME` at runtime, so the kit ships no hardcoded usernames or hostnames
 
 * **Openbox/X11 only** — no Wayland configuration. DORiS detects a Wayland
   session and warns, then stays X11.
-* **amd64 Debian trixie only** — that's the supported surface, on purpose.
+* **amd64 Debian trixie only** — that's the supported surface, on purpose for right now.
 * **Opinionated by design** — it recreates this way of computing, not a menu
   of desktop choices. Your keys, your panel, your wallpapers.
 * **Outbound firewall is all-TCP** — FTPS passive data channels negotiate
