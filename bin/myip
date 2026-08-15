@@ -2,3 +2,6 @@
 # Show your public IPv4 address.
 curl -4 -s ifconfig.me
 echo
+read -p "Press Enter to continue" </dev/tty
+
+#sleep 2
