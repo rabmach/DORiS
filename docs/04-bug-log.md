@@ -298,3 +298,37 @@ a live test user — the closest thing to a fresh install short of one.*
 *Filed 2026-08-13 from the first machine-agnostic fresh-install test (the
 8440). The net-install that found these was worth it: this is the only test
 that counts.*
+
+## BUG-011 — `x-file-manager` / `x-text-editor` never set on a fresh netinst
+
+**Symptom (2026-08-16, first wiped-drive fresh net-install, the P53s):**
+restore.sh completed with exactly one warning —
+`[WARN] update-alternatives x-file-manager failed (is thunar installed?)`.
+thunar *was* installed; the `--set` just never applied. `x-text-editor`
+wasn't attempted at all, so it stayed unset too. The user had to set both
+alternatives by hand afterwards.
+
+**Root cause:** `update-alternatives --set <name> <path>` fails with
+`error: no alternatives for <name>` (rc=2) when the *group* does not yet
+exist. On a fresh netinst nothing has registered the `x-file-manager` or
+`x-text-editor` groups — Debian only populates them when a desktop /
+editor package lands, and the kit's `--set` cannot create a group.
+(BUG-007's move of these tweaks into the system half was correct; the
+`--set` mechanism itself was the blind spot.)
+
+**Fix (tasks/system/04-assets.sh):** try `--set` first; on failure fall
+back to `update-alternatives --install <link> <name> <path> 30`, which
+creates the group, then `--set` again to force our choice. Both defaults
+are now set by the system half:
+  `x-file-manager -> /usr/bin/thunar` (priority 30)
+  `x-text-editor  -> /usr/bin/subl`   (sublime-text, priority 30)
+Verified the fallback path end-to-end on the fresh box with a throwaway
+group (`--set` rc=2 → `--install` creates → `--set` succeeds → removed).
+
+**Cost / note:** `--install` at priority 30 wins over any later DE that
+registers a competing default at a lower priority; the trailing `--set`
+makes the choice explicit anyway. The per-user half still only sets the
+inode/directory xdg-mime handler (no sudo) per BUG-007.
+
+*Filed 2026-08-16 from the first clean wiped-drive net-install — the P53s
+dogfood. Proof is in the restoration.*
