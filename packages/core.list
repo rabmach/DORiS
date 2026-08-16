@@ -23,6 +23,7 @@ rfkill
 cups
 hplip
 system-config-printer
+xsane
 avahi-daemon
 avahi-utils
 
@@ -77,16 +78,19 @@ rednotebook
 papers
 yt-dlp
 nmap
-whois
 catfish
 zenity
-hplip
+planner
+neverputt
+vym
+#freeplane   # NOT in the trixie archive (Debian dropped it: 1.7.x needs an old JRE).
+#            # Install the upstream .deb manually if wanted (freeplane.org / sourceforge).
 hplip-gui
-cups
 fuse
 
 # --- media / art / imaging ---
 mpv
+simplescreenrecorder
 feh
 gimp
 imagemagick
@@ -100,6 +104,7 @@ ffmpegthumbnailer
 geany
 geany-plugins
 git
+meld
 silversearcher-ag
 ripgrep
 gh
@@ -108,7 +113,6 @@ gh
 mc
 htop
 btop
-bashtop
 fastfetch
 starship
 bat
@@ -117,6 +121,7 @@ fd-find
 pulseaudio
 alsa-utils
 pnmixer
+mpg123
 libnotify-bin
 notification-daemon
 yad
@@ -144,8 +149,10 @@ nvtop
 vnstat
 iftop
 ncdu
+duc
 ncal
 net-tools
+tree
 duf
 powertop
 grc
@@ -186,6 +193,7 @@ aptitude
 curl
 wget
 whois
+bind9-dnsutils
 bc
 jq
 pwgen
@@ -202,9 +210,11 @@ espeak
 mbrola
 mbrola-en1
 gparted
+mintstick
 synaptic
 bleachbit
 gnome-characters
+yelp
 galternatives
 gvfs-backends
 tumbler
