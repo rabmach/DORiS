@@ -9,73 +9,12 @@ function pp() { myps f | awk '!/awk/ && $0~var' var=${1:-".*"} ; }
 function wordnet() { curl dict://dict.org/d:${1}:wn; }
 function mktar() { tar cvzf "${1%%/}.tar.gz"  "${1%%/}/"; }
 function mkzip() { zip -9 -r "${1%%/}.zip" "$1" ; }
-function mktbz() { tar cvjf "${1%%/}.tar.bz2" "${1%%/}/"; }
 function sanitize() { chmod -R u=rwX,g=rX,o= "$@" ;}
 function box() { t="$1xxxx";c=${2:-#}; echo ${t//?/$c}; echo "$c $1 $c"; echo ${t//?/$c}; }
 
                   #------------------------------------------////
                   # Handy Utility:
                   #------------------------------------------////
-
-function pwmk()
-{
-select passwordchoice in "Memorable Passwords" "Large Password Sheet"
-  do
-    case "$passwordchoice" in
-      "Memorable Passwords")
-        clear
-        shuf /usr/share/dict/words | head -n4
-      return
-      ;;
-      "Large Password Sheet")
-        clear
-        if ! dpkg -l | grep -q makepasswd; then sudo aptitude install -Pr makepasswd; fi
-        clear
-        echo -e "(This script runs 14 iterations to generate a variety of passwords.\nYou will get 14x the number you enter here. I reccommend you keep the number under 20 to avoid too much lag.)\nHow many passwords?"
-        read num
-        echo "Minimum length of each password?"
-        read minimum
-        echo "Maximum length?"
-        read maximum
-        clear
-        Numbers="1234567890"
-        Lowers="qwertyuiopasdfghjklzxcvbnm"
-        Uppers="QWERTYUIOPASDFGHJKLZXCVBNM"
-        Symbols="!@#$%^&*();:<>/?"
-        echo -e "Numbers, Lowercase, Uppercase, Symbols" >> passwordmakerfile
-        makepasswd --count $num --minchars $minimum --maxchars $maximum --string "$Numbers$Lowers$Uppers$Symbols" >> passwordmakerfile
-        echo -e "\nNumbers, Lowercase, Symbols" >> passwordmakerfile
-        makepasswd --count $num --minchars $minimum --maxchars $maximum --string "$Numbers$Lowers$Symbols" >> passwordmakerfile
-        echo -e "\nNumbers, Lowercase, Uppercase" >> passwordmakerfile
-        makepasswd --count $num --minchars $minimum --maxchars $maximum --string "$Numbers$Lowers$Uppers" >> passwordmakerfile
-        echo -e "\nNumbers, Symbols" >> passwordmakerfile
-        makepasswd --count $num --minchars $minimum --maxchars $maximum --string "$Numbers$Symbols" >> passwordmakerfile
-        echo -e "\nNumbers, Uppercase" >> passwordmakerfile
-        makepasswd --count $num --minchars $minimum --maxchars $maximum --string "$Numbers$Uppers" >> passwordmakerfile
-        echo -e "\nNumbers, Lowercase" >> passwordmakerfile
-        makepasswd --count $num --minchars $minimum --maxchars $maximum --string "$Numbers$Lowers" >> passwordmakerfile
-        echo -e "\nNumbers" >> passwordmakerfile
-        makepasswd --count $num --minchars $minimum --maxchars $maximum --string "$Numbers" >> passwordmakerfile
-        echo -e "\nLowercase, Uppercase, Symbols" >> passwordmakerfile
-        makepasswd --count $num --minchars $minimum --maxchars $maximum --string "$Lowers$Uppers$Symbols" >> passwordmakerfile
-        echo -e "\nLowercase, Symbols" >> passwordmakerfile
-        makepasswd --count $num --minchars $minimum --maxchars $maximum --string "$Lowers$Symbols" >> passwordmakerfile
-        echo -e "\nLowercase, Uppercase" >> passwordmakerfile
-        makepasswd --count $num --minchars $minimum --maxchars $maximum --string "$Lowers$Uppers" >> passwordmakerfile
-        echo -e "\nLowercase" >> passwordmakerfile
-        makepasswd --count $num --minchars $minimum --maxchars $maximum --string "$Lowers" >> passwordmakerfile
-        echo -e "\nUppercase, Symbols" >> passwordmakerfile
-        makepasswd --count $num --minchars $minimum --maxchars $maximum --string "$Uppers$Symbols" >> passwordmakerfile
-        echo -e "\nUppercase" >> passwordmakerfile
-        makepasswd --count $num --minchars $minimum --maxchars $maximum --string "$Uppers" >> passwordmakerfile
-        echo -e "\nSymbols" >> passwordmakerfile
-        makepasswd --count $num --minchars $minimum --maxchars $maximum --string "$Symbols" >> passwordmakerfile
-      return
-      ;;
-    esac
-  done
-}
-
 
 function hascommand() {
   # If no arguments or just '--strict' is provided, show help message
@@ -275,16 +214,23 @@ function findbig() {
     du -h -x -s -- * | sort -r -h | head -20;
 	}
 
+# findd: find directory names, 2 levels deep by default (findtext/findbig style)
+# usage: findd <name> [depth]   e.g.  findd music      findd storage 5
+# plain find(1) backend: no hidden-dir/gitignore defaults to fight (fd renamed
+# -I/--hidden to -H/--hidden in 8.0 and silently skips dot-dirs otherwise),
+# so .config & friends are found with zero flags.
+function findd() {
+    local pattern="${1:?usage: findd <name> [depth]}"
+    local depth="${2:-2}"
+    [[ "$depth" =~ ^[0-9]+$ ]] || { echo "findd: depth must be a number" >&2; return 1; }
+    command find . -maxdepth "$depth" -type d -iname "*${pattern}*" -print 2>/dev/null
+}
+
   function mostused() {
   local num_items="${1:-10}"  # Default to 10 if num_items is not specified
   history \
   | awk ' { a[$4]++ } END { for ( i in a ) print a[i], i | "sort -rn | head -n'"$num_items"'"}' \
   | awk '$1 > max{ max=$1} { bar=""; i=s=10*$1/max;while(i-->0)bar=bar"#"; printf "%25s %15d %s %s", $2, $1,bar, "\n"; }'
-}
-
-function mkd() {
-    mkdir -p "$@"
-    cd "$@" || exit
 }
 
 function mkcd() {
@@ -293,11 +239,6 @@ function mkcd() {
   else  
     mkdir newdir && cd newdir 
   fi
-}
-
-function status() {
-   echo -e "\nUser:\t $(whoami)\nHost:\t $(hostname)\nPWD:\t $PWD\n"   
-   uptime
 }
 
 function up ()
@@ -485,50 +426,8 @@ function fah2cel() {
 
 }
 
-###### temperature conversion script that lets the user enter
-# a temperature in any of Fahrenheit, Celsius or Kelvin and receive the
-# equivalent temperature in the other two units as the output.
-# usage:  convertatemp F100 (if don't put F,C, or K, default is F)
-function temp()
-{
-if uname | grep 'SunOS'>/dev/null ; then
-  echo "Yep, SunOS, let\'s fix this baby"
-  PATH="/usr/xpg4/bin:$PATH"
-fi
-if [ $# -eq 0 ] ; then
-  cat << EOF >&2
-Usage: $0 temperature[F|C|K]
-where the suffix:
-   F  indicates input is in Fahrenheit (default)
-   C  indicates input is in Celsius
-   K  indicates input is in Kelvin
-EOF
-  return 1
-fi
-unit="$(echo $1|sed -e 's/[-[[:digit:]]*//g' | tr '[:lower:]' '[:upper:]' )"
-temp="$(echo $1|sed -e 's/[^-[[:digit:]]*//g')"
-case ${unit:=F}
-in
-  F ) # Fahrenheit to Celsius formula:  Tc = (F -32 ) / 1.8
-  farn="$temp"
-  cels="$(echo "scale=2;($farn - 32) / 1.8" | bc)"
-  kelv="$(echo "scale=2;$cels + 273.15" | bc)"
-  ;;
-  C ) # Celsius to Fahrenheit formula: Tf = (9/5)*Tc+32
-  cels=$temp
-  kelv="$(echo "scale=2;$cels + 273.15" | bc)"
-  farn="$(echo "scale=2;((9/5) * $cels) + 32" | bc)"
-  ;;
-  K ) # Celsius = Kelvin + 273.15, then use Cels -> Fahr formula
-  kelv=$temp
-  cels="$(echo "scale=2; $kelv - 273.15" | bc)"
-  farn="$(echo "scale=2; ((9/5) * $cels) + 32" | bc)"
-esac
-echo "Fahrenheit = $farn"
-echo "Celsius    = $cels"
-echo "Kelvin     = $kelv"
-}
-
+                  #------------------------------------------////
+                  # Maths/Numbers:
                   #------------------------------------------////
                   # Maths/Numbers:
                   #------------------------------------------////
@@ -566,101 +465,53 @@ function sum() {
   printf -- '%d\n' "${sum}"
 }
 
-function dec2all() {
-  if [[ $1 ]]; then
-    echo "decimal $1 = binary $(dec2bin $1)"
-    echo "decimal $1 = octal $(dec2oct $1)"
-    echo "decimal $1 = hexadecimal $(dec2hex $1)"
-    echo "decimal $1 = base32 $(dec2b32 $1)"
-    echo "decimal $1 = base64 $(dec2b64 $1)"
-    echo "decimal $1 = ascii $(dec2asc $1)"
-  fi
+# baseconv — convert a number between positional bases 2-36.
+#   Usage:  baseconv <number> [from] [to]
+#   Defaults: from=10, to=16, so bare `baseconv 255` = decimal -> hex.
+#   Drop-in for the old helpers:
+#     dec2hex 255   -> baseconv 255
+#     dec2bin 255   -> baseconv 255 10 2
+#     dec2oct 255   -> baseconv 255 10 8
+#     oct2dec 377   -> baseconv 377 8
+#     oct2hex 377   -> baseconv 377 8 16
+#     bin2hex 1010  -> baseconv 1010 2 16
+#   Input accepts 0-9a-zA-Z, a leading '-' (negative), and a 0x/0X prefix
+#   (which forces from=16). Output is uppercase digits.
+#   Examples:
+#     baseconv 255         -> FF
+#     baseconv 255 10 2    -> 11111111
+#     baseconv 377 8       -> 255
+#     baseconv 0xA 16 2    -> 1010
+#     baseconv -255 10 16  -> -FF
+#     baseconv 2R 36 10    -> 99
+#   ASCII / text encodings are NOT positional math: use printf for char codes
+#     (printf '%b' "\\$(printf '%o' 65)"  -> A) and base64(1) for base64/32.
+function baseconv() {
+    local num from to sign dec result alphabet i v
+    alphabet="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    num="${1:?usage: baseconv <number> [from] [to]}"
+    from="${2:-10}"
+    to="${3:-16}"
+    [[ "$from" =~ ^([2-9]|[12][0-9]|3[0-6])$ ]] || { echo "baseconv: from must be 2-36" >&2; return 1; }
+    [[ "$to"   =~ ^([2-9]|[12][0-9]|3[0-6])$ ]] || { echo "baseconv: to must be 2-36" >&2; return 1; }
+    sign=""
+    [[ "$num" == -* ]] && { sign=-; num="${num#-}"; }
+    [[ "$num" =~ ^0[xX] ]] && { from=16; num="${num:2}"; }
+    [[ -n "$num" ]] || { echo "baseconv: empty number" >&2; return 1; }
+    [[ "$num" =~ ^[0-9A-Za-z]+$ ]] || { echo "baseconv: invalid character in '$num'" >&2; return 1; }
+    for ((i=0; i<${#num}; i++)); do
+        v=$((36#${num:$i:1}))
+        (( v >= from )) && { echo "baseconv: digit '${num:$i:1}' invalid in base $from" >&2; return 1; }
+    done
+    dec=$(( $from#$num )) || return 1
+    (( dec == 0 )) && result=0
+    while (( dec > 0 )); do
+        result="${alphabet:$((dec % to)):1}${result}"
+        dec=$((dec / to))
+    done
+    printf '%s%s\n' "$sign" "${result:-0}"
 }
 
-function dec2asc() {
-  if [[ $1 ]]; then
-    printf '%b' "\\$(printf '%o' "$1")\n"
-  fi
-}
-
-function dec2bin() {
-  if [[ $1 ]]; then
-    echo "obase=2 ; $1" | bc
-  fi
-}
-
-function dec2b64() {
-  if [[ $1 ]]; then
-    echo "obase=64 ; $1" | bc
-  fi
-}
-
-function dec2b32() {
-  if [[ $1 ]]; then
-    echo "obase=32 ; $1" | bc
-  fi
-}
-
-function dec2hex() {
-  if [[ $1 ]]; then
-    echo "obase=16 ; $1" | bc
-  fi
-}
-
-function dec2oct() {
-  if [[ $1 ]]; then
-    echo "obase=8 ; $1" | bc
-  fi
-}
-
-###### convert octals
-# copyright 2007 - 2010 Christopher Bratusek
-function oct2all() {
-  if [[ $1 ]]; then
-    echo "octal $1 = binary $(oct2bin $1)"
-    echo "octal $1 = decimal $(oct2dec $1)"
-    echo "octal $1 = hexadecimal $(oct2hex $1)"
-    echo "octal $1 = base32 $(oct2b32 $1)"
-    echo "octal $1 = base64 $(oct2b64 $1)"
-    echo "octal $1 = ascii $(oct2asc $1)"
-  fi
-}
-
-function oct2asc() {
-  if [[ $1 ]]; then
-    echo -e "\0$(printf %o $((8#$1)))"
-  fi
-}
-
-function oct2bin() {
-  if [[ $1 ]]; then
-    echo "obase=2 ; ibase=8 ; $1" | bc
-  fi
-}
-
-function oct2b64() {
-  if [[ $1 ]]; then
-    echo "obase=64 ; ibase=8 ; $1" | bc
-  fi
-}
-
-function oct2b32() {
-  if [[ $1 ]]; then
-    echo "obase=32 ; ibase=8 ; $1" | bc
-  fi
-}
-
-function oct2dec() {
-  if [[ $1 ]]; then
-    echo $((8#$1))
-  fi
-}
-
-function oct2hex() {
-  if [[ $1 ]]; then
-    echo "obase=16 ; ibase=8 ; $1" | bc
-  fi
-}
 
 ###### powers of numerals
 # copyright 2007 - 2010 Christopher Bratusek
@@ -679,44 +530,6 @@ function sqrt()
 echo "sqrt ("$1")" | bc -l
 }
 
-
-###### Generates neverending list of random numbers
-function randomnumbers()
-{
-while :
-do
- echo $RANDOM $RANDOM $RANDOM $RANDOM $RANDOM $RANDOM $RANDOM $RANDOM $RANDOM $RANDOM $RANDOM $RANDOM
-done
-}
-
-###### generate prime numbers, without using arrays.
-# script contributed by Stephane Chazelas.
-function primes()
-{
-LIMIT=1000                    # Primes, 2 ... 1000.
-Primes()
-{
- (( n = $1 + 1 ))             # Bump to next integer.
- shift                        # Next parameter in list.
-#  echo "_n=$n i=$i_"
- if (( n == LIMIT ))
- then echo $*
- return
- fi
- for i; do                    # "i" set to "@", previous values of $n.
-#   echo "-n=$n i=$i-"
-   (( i * i > n )) && break   # Optimization.
-   (( n % i )) && continue    # Sift out non-primes using modulo operator.
-   Primes $n $@               # Recursion inside loop.
-   return
-   done
-   Primes $n $@ $n            #  Recursion outside loop.
-                              #  Successively accumulate
-            #+ positional parameters.
-                              #  "$@" is the accumulating list of primes.
-}
-Primes 1
-}
 
 function sec2all()
 {
@@ -791,14 +604,17 @@ function lcfiles() {
 	fi
 	}
 	
-  # Convert the first letter into uppercase letters
+  # Capitalize the first character. With one arg, that char of the whole
+  # string (spaces and shell metachars are safe — arg passes quoted); with
+  # no arg, acts as a stdin filter uppercasing each line's first char.
+  # UTF-8 aware: perl -CSDA decodes @ARGV and -CS decodes stdin.
 function ucfirst() {
-      if [ -n "$1" ]; then
-          perl -e 'print ucfirst('$1')'
-      else
-          cat - | perl -ne 'print ucfirst($_)'
-      fi
-	}
+    if [[ $# -ge 1 ]]; then
+        perl -CSDA -e 'print ucfirst($ARGV[0]), "\n"' "$1"
+    else
+        perl -CS -ne 'print ucfirst($_)'
+    fi
+}
 
 
 function extract ()
@@ -852,23 +668,6 @@ whassup() {
     ;;
   esac
 }
-
-
-function ii2() {
-    echo -e "\n${RED}You are logged onto:${NC} " ; hostname
-    echo -e "\n${GREEN}Additional information:${NC} " ; uname -a
-    echo -e "\n${RED}Users logged on:${NC} " ; w -h
-    echo -e "\n${GREEN}Current date:${NC} " ; date
-    echo -e "\n${RED}Machine stat:${NC} " ; uptime
-    echo -e "\n${GREEN}Disk space:${NC} " ; df -h
-    echo -e "\n${RED}Memory stats (in MB):${NC} "
-    if [ "$(uname -s)" = "Linux" ]; then
-        free -m
-    elif [ "$(uname -s)" = "Darwin" ]; then
-        vm_stat
-    fi
-    echo -e "\n${GREEN}IPs:${NC} " ; hostname -I
-	}
 
 
 # List available aliases with optional filter parameter

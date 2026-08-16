@@ -15,7 +15,7 @@ export PROMPT_COMMAND='LAST_COMMAND_EXIT=$? && history -a && test 127 -eq $LAST_
 export HISTCONTROL=ignoreboth:erasedups:ignorespace
 export HISTSIZE=5000
 export HISTFILESIZE=10000
-export HISTIGNORE='&:[ ]*:ls:ll:l:la:[bf]g:nap:fetcher:again:cl:burn:apps:wicn:weather:aliases:wr:frank:update:updoogie:deb:killtunes:tunes:hg:upgrade:history:h:cpf:otto:obr:auto:htop:src:clear:sync:cd:cl:exit'
+export HISTIGNORE='&:[ ]*:ls:ll:l:la:[bf]g:nap:fetcher:again:cl:burn:apps:wicn:weather:aliases:wr:frank:update:updoogie:deb:killtunes:tunes:hg:upgrade:history:h:cpf:otto:obr:auto:htop:src:clear:sync:cd:cl:exit:mkpwd:pphrase'
 export HISTTIMEFORMAT="%d/%m/%y %T "
 shopt -s checkwinsize
 shopt -s histappend
@@ -23,6 +23,16 @@ shopt -s extglob
 set -o notify
 # color variables used by .bash_functions and prompts
 [ -f ~/.bashcolors ] && . ~/.bashcolors
+# colored man pages: groff must emit overstrikes (not SGR) for less to
+# re-color them via the termcap overrides below; GROFF_NO_SGR forces that.
+export GROFF_NO_SGR=1
+export LESS_TERMCAP_mb=$'\e[1;31m'      # begin blink (rarely used)
+export LESS_TERMCAP_md=$'\e[1;34m'      # begin bold -> blue section headers
+export LESS_TERMCAP_me=$'\e[0m'         # end bold
+export LESS_TERMCAP_so=$'\e[01;33m'     # begin standout (search hits) -> yellow
+export LESS_TERMCAP_se=$'\e[0m'         # end standout
+export LESS_TERMCAP_us=$'\e[4;32m'      # begin underline -> green
+export LESS_TERMCAP_ue=$'\e[0m'         # end underline
 if [ -z "${debian_chroot:-}" ] && [ -r /etc/debian_chroot ]; then
     debian_chroot=$(cat /etc/debian_chroot)
 fi
@@ -140,5 +150,8 @@ eval "$(starship init bash)"
 source ~/bin/lscolors.sh
 ulimit -n 4096
 
-# opencode
-export PATH=$HOME/.opencode/bin:$PATH
+# opencode (idempotent: opencode injects its own bin dir when it spawns a shell)
+case ":$PATH:" in
+  *":$HOME/.opencode/bin:"*) ;;
+  *) export PATH="$HOME/.opencode/bin:$PATH" ;;
+esac
