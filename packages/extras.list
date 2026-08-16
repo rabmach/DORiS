@@ -1,21 +1,29 @@
 # doris extra packages - NOT installed by default.
 # Install with: ./restore.sh --extras   (or uncomment lines you want)
 # One package name per line; '#' starts a comment.
+#
+# 2026-08-16: the original extras (meld, mintstick, mpg123, neverputt,
+# planner, simplescreenrecorder, vym, yelp) were promoted to core.list.
+# These are the current optional layer - user taste / niche tools.
 
-# screen recording
-simplescreenrecorder
+# terminals / shells
+kitty
+
+# audio / bpm tooling (aubio backs ~/groovin)
+aubio-tools
+python3-aubio
+
+# character map app (the GUI, not the lib)
+gucharmap
+
+# crypto / network diagnostics
+sqv
+traceroute
+
+# games
+gnome-mahjongg
 
 # BunsenLabs-flavoured leftovers (installed on the reference box, not core)
 #tint2
 #pcmanfm
 #gmrun
-
-# productivity / misc (niche but handy)
-freeplane
-vym
-planner
-yelp
-neverputt
-mintstick
-meld
-mpg123
