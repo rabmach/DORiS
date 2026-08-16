@@ -69,21 +69,37 @@ else
     log "All config icon/theme references point at system paths."
 fi
 
-# ── File-manager default (x-file-manager -> thunar) ─────────
+# ── File-manager + text-editor defaults ─────────────────────
 # BUG-007: this used to live in the per-user half as `sudo update-alternatives
 # --set`, but a plain ./user-setup.sh has no business needing root, and sudo
 # on a fresh install prompts for a password - so the win+f tweak silently
-# never applied there. The system-wide alternative belongs to the SYSTEM
+# never applied there. The system-wide alternatives belong to the SYSTEM
 # half (we are root here); the per-user half only sets the inode/directory
 # handler for the individual user.
+# BUG-011: on a fresh netinst the x-file-manager / x-text-editor groups do
+# NOT exist (no package registers them until a DE lands), so --set alone
+# fails with "no alternatives". Fall back to --install, which creates the
+# group, then --set to force our choice (thunar / sublime_text).
 if command -v thunar >/dev/null 2>&1; then
-    if sudo update-alternatives --set x-file-manager /usr/bin/thunar 2>/dev/null; then
-        log "x-file-manager alternative set -> thunar."
-    else
-        warn "update-alternatives x-file-manager failed (is thunar installed?)."
+    if ! sudo update-alternatives --set x-file-manager /usr/bin/thunar 2>/dev/null; then
+        sudo update-alternatives --install /usr/bin/x-file-manager x-file-manager /usr/bin/thunar 30 2>/dev/null \
+            || warn "update-alternatives x-file-manager failed (is thunar installed?)."
+        sudo update-alternatives --set x-file-manager /usr/bin/thunar 2>/dev/null || true
     fi
+    log "x-file-manager alternative -> thunar."
 else
     log "thunar not installed - x-file-manager alternative left as-is."
+fi
+
+if command -v subl >/dev/null 2>&1; then
+    if ! sudo update-alternatives --set x-text-editor /usr/bin/subl 2>/dev/null; then
+        sudo update-alternatives --install /usr/bin/x-text-editor x-text-editor /usr/bin/subl 30 2>/dev/null \
+            || warn "update-alternatives x-text-editor failed (is sublime-text installed?)."
+        sudo update-alternatives --set x-text-editor /usr/bin/subl 2>/dev/null || true
+    fi
+    log "x-text-editor alternative -> subl."
+else
+    log "sublime-text not installed - x-text-editor alternative left as-is."
 fi
 
 log "Icons/themes installed system-wide."
