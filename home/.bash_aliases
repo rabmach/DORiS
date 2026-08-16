@@ -27,6 +27,7 @@ alias src='source ~/.bashrc'
 alias path='echo -e ${PATH//:/\\n}'
 alias h='history'
 alias home='cl ~'
+alias fd='fdfind' # Debian ships fd-find as fdfind; give it back its name
 alias rslv='sudo nano /etc/resolv.conf'
 alias map='telnet mapscii.me'
 alias bp="sudo chattr +i ${HOME}/.bashrc"
