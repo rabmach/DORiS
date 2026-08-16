@@ -1,6 +1,9 @@
 # DORiS — Debian Openbox Restoration Script
 
-One stick. One button. Hardened, configured, wicked desktop. Off-line. Run and done.
+Newcomers don't usually land on Debian + Openbox — that's a choice people make
+after they've been burned by a desktop war, or fallen for the blank-canvas
+minimalism. DORiS won't mint that taste; it will *meet* it, perfectly, the
+moment someone has it.
 
 DORiS is a desktop restoration system for **any amd64 machine** running Debian
 trixie. Run it after a fresh net-install and it recreates the doris desktop —
