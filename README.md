@@ -6,12 +6,12 @@ minimalism. DORiS won't mint that taste; it will *meet* it, perfectly, the
 moment someone has it.
 
 DORiS is a desktop restoration system for **any amd64 machine** running Debian
-trixie. Run it after a fresh net-install and it recreates the doris desktop —
+trixie. It was initially a handy way for me to restore my own setup after a net-install, and it still is, but, being machine agnostic makes it a cool thing to share. Run it after a fresh net-install and it recreates the "DORiS" desktop —
 Openbox/X11, keyboard-driven, hardened — from one kit. Everything the restore
 needs is vendored inside this repo, so it works offline: the only network it
-needs is `apt`. Two browsers, configured and hardened for you, of course.
+needs is `apt`. I use Firefox and Helium, so they's in the kit, configured and hardened, at least a little bit.
 Menus, keys, firewall, welcome screen. It's a whole 'nother level, right in
-your pocket.
+your pocket. Heh, or, at least I think so.
 
 ![The doris desktop](docs/images/desktop.jpg)
 *The doris desktop — Openbox, keyboard-driven...colorful.*
