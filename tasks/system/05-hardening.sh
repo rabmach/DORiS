@@ -102,6 +102,39 @@ if [[ -d "$HARDENING/apparmor" ]]; then
         log "  AppArmor profiles already in place."
     fi
 
+    # Remove stub profiles for apps that are not installed.
+    # The base apparmor package ships ~90 unconfined/default_allow stubs
+    # for apps that may never exist on this box. Each stub loads into the
+    # kernel for zero benefit. Only touch stubs — never remove real
+    # profiles (complain/enforce) or DORiS-shipped profiles.
+    AA_DISABLED_DIR="/etc/backups/apparmor-disabled"
+    sudo mkdir -p "$AA_DISABLED_DIR"
+    AA_PRUNED=0
+    DORIS_AA_PROFILES="helium-bin helium-bin.dist-default-allow sublime-text"
+    for f in /etc/apparmor.d/*; do
+        [[ -f "$f" ]] || continue
+        bn=$(basename "$f")
+        # Skip DORiS-shipped profiles, abstractions, tunables, ABI, local includes
+        [[ "$bn" == abi || "$bn" == abstractions || "$bn" == tunables \
+            || "$bn" == local || "$bn" == disable || "$bn" == force-complain \
+            || "$bn" == *".d" ]] && continue
+        echo "$DORIS_AA_PROFILES" | grep -qw "$bn" && continue
+        # Only touch unconfined or default_allow stubs
+        grep -qE "flags=\((unconfined|default_allow)\)" "$f" || continue
+        # Extract binary path from profile line
+        bin_path=$(grep -oE 'profile [^ ]+ "?(/[^ "]+"?)' "$f" | grep -oE '/[^ "]+')
+        [[ -z "$bin_path" ]] && continue
+        # If binary exists on disk, skip — app is installed
+        [[ -f "$bin_path" ]] && continue
+        # Binary not found — prune the stub
+        sudo mv "$f" "$AA_DISABLED_DIR/" && AA_PRUNED=$((AA_PRUNED + 1))
+    done
+    if [[ "$AA_PRUNED" -gt 0 ]]; then
+        sudo aa-teardown 2>/dev/null || true
+        sudo /lib/apparmor/apparmor.systemd reload 2>/dev/null || true
+        log "  AppArmor: pruned $AA_PRUNED stub profiles for uninstalled apps."
+    fi
+
     # auditd must be running for complain-mode profiles to log anywhere.
     if command -v auditd >/dev/null; then
         if [[ -f "$HARDENING/auditd/auditd.conf" ]]; then
