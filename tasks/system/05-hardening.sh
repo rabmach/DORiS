@@ -12,6 +12,7 @@
 #   * /etc/nftables.conf  -> default-deny in AND out; see backup tarball
 #   * systemd-resolved removed; resolv.conf managed by NetworkManager
 #   * AppArmor profiles installed in COMPLAIN mode (audit only)
+#   * cupsd profile disabled (stock profile breaks printing; see D15)
 #   * journald capped, debsecan cron for security announcements
 #   * CPU governor = powersave
 
@@ -133,6 +134,18 @@ if [[ -d "$HARDENING/apparmor" ]]; then
         sudo aa-teardown 2>/dev/null || true
         sudo /lib/apparmor/apparmor.systemd reload 2>/dev/null || true
         log "  AppArmor: pruned $AA_PRUNED stub profiles for uninstalled apps."
+    fi
+
+    # Disable the stock cupsd profile. The cups-daemon package ships an
+    # AppArmor profile that is fundamentally incomplete — it blocks every
+    # filter, backend, CGI script, font path, and capability CUPS needs.
+    # Fixing it is whack-a-mole (gs, poppler, fontconfig, PAM, audit_write,
+    # setgid/setuid/dac_read_search/fsetid/kill capabilities, CGI binaries…).
+    # CUPS listens on localhost:631 only and the firewall already controls
+    # egress — the profile is not worth the maintenance tax.
+    if [[ -f /etc/apparmor.d/usr.sbin.cupsd ]] && ! [[ -L /etc/apparmor.d/disable/usr.sbin.cupsd ]]; then
+        sudo aa-disable /usr/sbin/cupsd 2>/dev/null || true
+        log "  AppArmor: cupsd profile disabled (see decision journal D15)."
     fi
 
     # auditd must be running for complain-mode profiles to log anywhere.
