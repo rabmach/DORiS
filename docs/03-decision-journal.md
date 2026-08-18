@@ -377,6 +377,49 @@ machines forever); two fully separate kits (drops the shared learning).
 skeletons, and the browser/welcome machinery are shared — the delta is small
 and reviewable.
 
+### D15 — Disable the stock cupsd AppArmor profile
+
+**Decision:** `aa-disable cupsd` in task 05. The `cups-daemon` package ships
+an AppArmor profile for `/usr/sbin/cupsd` that is fundamentally incomplete.
+Rather than maintain our own, we disable it entirely.
+
+**Why:** When AppArmor is active (task 05 enables it via kernel cmdline),
+the stock cupsd profile loads in enforce mode and breaks printing completely.
+The profile grants `mr` (mmap+read) on `/usr/lib/cups/**` but no execute —
+every filter (texttopdf, pdftopdf, pdftops, hpps), every backend (socket,
+usb, ipp), every CGI script (admin.cgi, printers.cgi, jobs.cgi), and
+ghostscript are denied exec. Fixing that requires:
+
+- Exec rules for filters, backends, CGI, gs (`ix`)
+- Capabilities: `setgid`, `setuid`, `fsetid`, `dac_read_search`,
+  `kill`, `audit_write` (CUPS drops from root to lp for each filter)
+- Read access to fonts (`/etc/fonts/**`, `/usr/share/fonts/**`), fontconfig
+  (`/usr/share/fontconfig/**`), poppler CMap data (`/usr/share/poppler/**`),
+  ghostscript resources (`/usr/share/ghostscript/**`,
+  `/var/lib/ghostscript/**`), ICC profiles (`/usr/share/color/**`)
+- PAM abstraction for the web interface authentication
+- Explicit `r`/`rw` on directory paths (`/etc/cups/`, `/run/cups/`,
+  `/var/spool/cups/`, `/var/cache/cups/`) — `**` glob alone doesn't grant
+  directory traversal in AppArmor
+
+Every fix revealed another denial. The profile was 50+ lines of rules and
+still incomplete — it's a maintenance tax on every CUPS/ghostscript/poppler
+upgrade.
+
+**The math:** CUPS listens on `localhost:631` only. The nftables firewall
+already controls all egress. The only risk is a local privilege escalation
+via a CUPS filter — which runs as lp, inside a localhost-only service, on a
+single-user desktop. The stock profile's cost (broken printing, ongoing
+maintenance, surprise breakage on upgrades) far exceeds its benefit.
+
+**Alternatives considered:** Ship a complete cupsd profile (maintenance
+burden, always behind upstream); ship in complain mode (noisy audit log,
+no real benefit for a localhost service).
+
+**Compromise / cost:** cupsd runs unconfined. Profile file stays on disk
+in `/etc/apparmor.d/disable/` — re-enable with `aa-enforce` if the threat
+model changes. The disable step is idempotent (checks for existing symlink).
+
 ---
 
 *This journal is a living document. When a decision gets overturned, don't
