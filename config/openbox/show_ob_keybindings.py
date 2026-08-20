@@ -52,11 +52,21 @@ class rcHandler(saxutils.handler.ContentHandler): # handler class inherits from 
         self.rcfile = rcfilepath
         self.replacements = {"C-":"Ctrl+","W-":"Windows+","S-":"Shift+","A-":"Alt+","M-":"Meta+","H-":"Hyper+"}
         self.regexp = re.compile('|'.join(map(re.escape, self.replacements.keys())))
-    # this function should return a string containing the command you want to run for the current keybinding        
-    def editCommand(self,rcfile,keybind): 
-        return 'emacsclient -a emacs -e \'(progn (find-file "' + rcfile + '") ' + \
-            '(goto-char (point-min)) (re-search-forward "\\\"' + keybind + '\\\""))\''
-        
+ ####-------------------------------------------------------------------------------------------------------------//
+ ##   # this function should return a string containing the command you want to run for the current keybinding        
+ ##   def editCommand(self,rcfile,keybind): 
+ ##       return 'emacsclient -a emacs -e \'(progn (find-file "' + rcfile + '") ' + \
+ ##           '(goto-char (point-min)) (re-search-forward "\\\"' + keybind + '\\\""))\''
+ ####-------------------------------------------------------------------------------------------------------------//
+ # above was original script. Modified locally to use sublime-text 
+ # this function opens sublime_text at the line of the keybind clicked in the menu, it's way handy, you know, for editing. Modified from original using emacs.
+    def editCommand(self,rcfile,keybind):
+        with open(rcfile) as f:
+            for i, line in enumerate(f, 1):
+                if 'key="' + keybind + '"' in line:
+                    return 'subl "' + rcfile + ':' + str(i) + '"'
+        return 'subl "' + rcfile + '"'
+          
     # override function from DefaultHandler, called at start of xml element
     def startElement(self, name, attrs):
         # start of <keybind ...> item
