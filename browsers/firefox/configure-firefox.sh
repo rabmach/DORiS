@@ -142,7 +142,7 @@ open_ff() {
 # clicks "Add to Firefox" on the page we opened. Returns 0 once installed.
 watch_installed() {
   local name="$1" id="$2" waited=0
-  echo "    watching for ${name} install (click 'Add to Firefox' on the page)..."
+  echo "    watching for ${name} install..."
   while (( waited < 300 )); do
     ext_installed "$id" && { echo "  ✓ ${name} installed."; return 0; }
     sleep 3
@@ -163,7 +163,14 @@ ask() {
     read -rp "  Open page for ${name}? [Y/n] " ans || ans=""
   fi
   case "${ans:-y}" in
-    y|Y|"") open_ff "$url" >/dev/null 2>&1 || true; watch_installed "$name" "$id" ;;
+    y|Y|"")
+      open_ff "$url" >/dev/null 2>&1 || true
+      echo
+      echo "    Firefox is opening the ${name} page."
+      echo "    Click 'Add to Firefox', then alt-tab back here."
+      echo
+      watch_installed "$name" "$id"
+      ;;
     *) echo "  - skipped" ;;
   esac
 }
