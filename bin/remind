@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-#vibe coded, heh - opencode prompted 22 may 26
+#machiner opencode 22 may 26
+##--------------------------------------------//
+
 MESSAGE="Hey, man, it's time"
 
 to_seconds() {
