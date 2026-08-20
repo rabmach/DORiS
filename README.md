@@ -11,7 +11,7 @@ Openbox/X11, keyboard-driven, hardened — from one kit. Everything the restore
 needs is vendored inside this repo, so it works offline: the only network it
 needs is `apt`. I use Firefox and Helium, so they's in the kit, configured and hardened, at least a little bit.
 Menus, keys, firewall, welcome screen. It's a whole 'nother level, right in
-your pocket. Heh, or, at least I think so.
+your pocket. Heh, or, at least I think so. I have been running the <a target="_blank" href="https://github.com/tycho-kirchner/fastcompmgr" title="fastcompmgr">fastcompmgr</a> compositor for some years and it's been great so it's included in DORiS run from ~/bin.
 
 ![The doris desktop](docs/images/desktop.jpg)
 *The doris desktop — Openbox, keyboard-driven...colorful.*
