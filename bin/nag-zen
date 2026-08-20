@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
-
+#machiner opencode may 26
+##--------------------------------------------//
+## IF you're running DORiS there is already a keybind for this handy tool
+##    <keybind key="C-A-n">
+##      <action name="Execute">
+##        <name>nag, reminder</name>
+##        <command>nag-zen</command>
+##      </action>
+##    </keybind>
+##--------------------------------------------//
 MESSAGE="Hey, man, it's time"
 
 to_seconds() {

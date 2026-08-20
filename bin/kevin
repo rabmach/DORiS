@@ -1,9 +1,0 @@
-#!/bin/bash
-## original script leonardo marcov
-# Check root
-[ "$(id -u)" -ne 0 ] && { echo "Must run as root" 1>&2; exit 1; }
-
-# Install packages
-echo -e "\e[1mInstalling packages...\e[0m"
-[ "$(find /var/cache/apt/pkgcache.bin -mtime 0 2>/dev/null)" ] || apt-get update  
-apt-get -y install xorg x11-xserver-utils intel-microcode polkitd xinit intel-media-va-driver-non-free va-driver-all mesa-utils mesa-va-drivers dbus dbus-x11 pkexec mpg123 alsa-utils libnotify-bin notification-daemon smartmontools pulseaudio gvfs-backends arandr pnmixer mc lshw lsof ncal ncdu htop apt-utils at upower menu menu-xdg rsync fastfetch xscreensaver xscreensaver-gl xscreensaver-gl-extra fd-find libxml2-utils tar unzip zip pwgen usbutils yad grc duf xdg-user-dirs-gtk xdg-utils xdotool util-linux imagemagick ips mpv net-tools xclip gsimplecal hwinfo iftop jpegoptim libimage-exiftool-perl silversearcher-ag galternatives sysstat vnstat xpdf fonts-jetbrains-mono acpi lm-sensors python3-pexpect sensible-utils iotop inxi psmisc s-tui sed dfc curl feh bat lsd nvtop unclutter numlockx wget whois bc jq tango-icon-theme obsidian-icon-theme arc-theme openbox orage gmrun gpicview gnome-characters obsession lxpanel engrampa thunar thunar-archive-plugin meld mintstick alacritty xfce4-clipman oxygencursors lxappearance papirus-icon-theme espeak mbrola mbrola-en1 redshift-gtk audacious libreoffice libreoffice-gtk3 murrine-themes lxappearance-obconf neverputt gparted pithos ffmpeg scrot starship vym yelp zenity planner xfce4-screenshooter gimp keepassxc bleachbit gifsicle synaptic geany geany-plugins ffmpegthumbnailer claws-mail bogofilter claws-mail-bogofilter lynx claws-mail-fancy-plugin claws-mail-pgpmime claws-mail-tools claws-mail-pgpinline claws-mail-vcalendar-plugin
