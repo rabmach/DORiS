@@ -53,6 +53,15 @@ d.pop("enterprise_profile_guid", None)
 # SystemTheme enum (ui/color/system_theme.h): 1 = kGtk. Makes Helium follow
 # the desktop GTK theme (helium://settings appearance -> "Use GTK theme").
 d.setdefault("extensions", {}).setdefault("theme", {})["system_theme"] = 1
+# Privacy: no search suggestions, global privacy control header.
+d.setdefault("search", {})["suggest_enabled"] = False
+d.setdefault("helium", {})["global_privacy_control"] = True
+# Helium browser prefs: MRU tab cycling (ctrl+tab), zen/frameless mode,
+# completed onboarding so the first-run wizard does not reappear.
+hbr = d.setdefault("helium", {}).setdefault("browser", {})
+hbr["mru_tab_cycling"] = True
+hbr["zen_mode"] = True
+d.setdefault("helium", {})["completed_onboarding"] = True
 # Helium services are ENABLED deliberately (idempotent: older runs of this
 # script set them false, and a re-run must re-enable them): the extension
 # proxy ("ext_proxy") is what fetches Chrome Web Store downloads/updates, so
@@ -62,10 +71,14 @@ svcs = d.setdefault("helium", {}).setdefault("services", {})
 svcs["enabled"] = True
 svcs["ext_proxy"] = True
 svcs["user_consented"] = True
+svcs["bangs"] = False
+svcs["browser_updates"] = False
+svcs["spellcheck_files"] = False
+svcs["ublock_assets"] = False
 json.dump(d, open(prefs, "w"), indent=1)
 
 s = json.load(open(lstate))
-s["dns_over_https"] = {"mode": "secure", "templates": "https://chromium.dns.nextdns.io"}
+s["dns_over_https"] = {"mode": "secure", "templates": "https://dns.quad9.net/dns-query"}
 for app in s.get("updateclientdata", {}).get("apps", {}).values():
     app.pop("pf", None)
     app.pop("fp", None)
@@ -73,9 +86,10 @@ json.dump(s, open(lstate, "w"), indent=1)
 PY
 
 echo "  ✓ Preferences patched (prediction off, no password leak check,"
-echo "    no profile GUID, system GTK theme on, Helium services enabled so"
-echo "    the extension proxy works)"
-echo "  ✓ Local State patched (DoH secure via NextDNS, updater GUIDs cleared)"
+echo "    no profile GUID, system GTK theme on, search suggestions off,"
+echo "    MRU tab cycling on, zen mode on, global privacy control on,"
+echo "    Helium services enabled so the extension proxy works)"
+echo "  ✓ Local State patched (DoH secure via Quad9, updater GUIDs cleared)"
 
 # ---------------------------------------------------------------------------
 echo
