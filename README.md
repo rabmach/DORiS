@@ -3,7 +3,7 @@
 Newcomers don't usually land on Debian + Openbox — that's a choice people make
 after they've been burned by a desktop war, or fallen for the blank-canvas
 minimalism. DORiS won't mint that taste; it will *meet* it, perfectly, the
-moment someone has it.
+moment someone has it. [Get there from here.](docs/01-the-path.md)
 
 DORiS is a desktop restoration system for **any amd64 machine** running Debian
 trixie. It was initially a handy way for me to restore my own setup after a net-install, and it still is, but, being machine agnostic makes it a cool thing to share. Run it after a fresh net-install and it recreates the "DORiS" desktop —
@@ -76,6 +76,8 @@ watch the kit work end to end.
 * [**00 — The Big Picture**](docs/00-big-picture.md) — quick version first,
   then the architecture exploded: the two halves, the restore flow, task by
   task, the supporting machinery, and the honest limits.
+* [**01 — The Path**](docs/01-the-path.md) — what you need, the concepts,
+  and the step-by-step from fresh net-install to running DORiS.
 * [**03 — The Decision Journal**](docs/03-decision-journal.md) — every real
   decision in the kit, with the if/then/buts: why Openbox, why bash, why the
   firewall has an all-TCP outbound, why the browser assistant is interactive,
