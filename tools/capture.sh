@@ -36,9 +36,6 @@ done
 rm -rf "$DORIS_DIR/bin"
 mkdir -p "$DORIS_DIR/bin"
 cp -a "$H"/bin/. "$DORIS_DIR/bin/" 2>/dev/null || true
-# browsers-setup is the assistant staged from browsers/post-login.sh (task 11),
-# not a hand-maintained bin script - keep the kit source in browsers/ only.
-rm -f "$DORIS_DIR/bin/browsers-setup"
 
 # local assets
 # Icons/themes now live in /usr/share (not ~/.local) so root apps match.

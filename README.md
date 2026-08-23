@@ -9,7 +9,7 @@ DORiS is a desktop restoration system for **any amd64 machine** running Debian
 trixie. It was initially a handy way for me to restore my own setup after a net-install, and it still is, but, being machine agnostic makes it a cool thing to share. Run it after a fresh net-install and it recreates the "DORiS" desktop —
 Openbox/X11, keyboard-driven, hardened — from one kit. Everything the restore
 needs is vendored inside this repo, so it works offline: the only network it
-needs is `apt`. I use Firefox and Helium, so they's in the kit, configured and hardened, at least a little bit.
+needs is `apt`.
 Menus, keys, firewall, welcome screen. It's a whole 'nother level, right in
 your pocket. Heh, or, at least I think so. I have been running the <a target="_blank" href="https://github.com/tycho-kirchner/fastcompmgr" title="fastcompmgr">fastcompmgr</a> compositor for some years and it's been great so it's included in DORiS run from ~/bin.
 
@@ -18,9 +18,6 @@ your pocket. Heh, or, at least I think so. I have been running the <a target="_b
 
 ![First-login welcome](docs/images/welcome.jpg)
 *First-login welcome — generated from the kit itself, so it never rots.*
-
-![Browser setup assistant](docs/images/browsers.jpg)
-*The browser assistant — walks you through Firefox + Helium setup with hardened profiles.*
 
 ## Why DORiS
 
@@ -79,9 +76,8 @@ watch the kit work end to end.
 * [**01 — The Path**](docs/01-the-path.md) — what you need, the concepts,
   and the step-by-step from fresh net-install to running DORiS.
 * [**03 — The Decision Journal**](docs/03-decision-journal.md) — every real
-  decision in the kit, with the if/then/buts: why Openbox, why bash, why the
-  firewall has an all-TCP outbound, why the browser assistant is interactive,
-  why the kit split in two.
+   decision in the kit, with the if/then/buts: why Openbox, why bash, why the
+   firewall has an all-TCP outbound, why the kit split in two.
 * [**04 — The Bug Log**](docs/04-bug-log.md) — the bugs that survived to a
   real machine: fresh-install ownership, the invisible task failure, the
   stale key pin. Each with root cause and fix, kept as a teaching record.
@@ -121,7 +117,7 @@ watch the kit work end to end.
 
 4. Reboot. `startx` (or configure auto-login). The first-login welcome
    screen greets you with keybinds, aliases, timers and the one-time
-   credential chores, then offers the browser setup menu.
+   credential chores.
 
 The kit can live anywhere and DORiS doesn't care: `~/DORiS` from a `git
 clone`, a mounted backup drive (`/mnt/…`), a USB stick, whatever. You just
@@ -137,7 +133,7 @@ DORiS splits into two halves:
 | half | script | when | does what |
 |------|--------|------|-----------|
 | **system** | `sudo ./restore.sh` | once per machine | repos, packages, system-wide icons+themes, firewall, DNS strategy, AppArmor, logs, timers |
-| **per-user** | `sudo ./user-setup.sh` | once per user | dotfiles, `~/bin`, films.txt, wallpapers, browsah browser assistant, first-login welcome |
+| **per-user** | `sudo ./user-setup.sh` | once per user | dotfiles, `~/bin`, films.txt, wallpapers, first-login welcome |
 
 Run the system half once, then the per-user half for every user who logs
 in on that machine. Both are idempotent and back up before they touch a
@@ -161,8 +157,7 @@ file, so a second user — or a re-run — is safe.
 | task | what |
 |------|------|
 | 10-config | `config/` → `~/.config`, `bin/` → `~/bin`, `home/` → `~/` (dotfiles + **films.txt**), Thunar scripts, `Pictures/`; `$USER`/`$HOSTNAME` tokens baked in |
-| 11-browsers | stages browsah → `~/browsah`, installs the **assistant** `~/bin/browsers-setup` (the welcome menu drives first-login setup) |
-| 12-welcome | generates the first-login welcome from the kit (keybinds, aliases, timers, admin apps, credential nags, dad joke), then offers the browser setup menu; arms the AppArmor review timer |
+| 12-welcome | generates the first-login welcome from the kit (keybinds, aliases, timers, admin apps, credential nags, dad joke); arms the AppArmor review timer |
 
 ## Applying updates
 
@@ -171,7 +166,7 @@ To apply a kit update, re-run the half that owns the changed task:
 
 * system-level changes (`tasks/system/*`, e.g. `update-alternatives`,
   nftables, sysctl, packages) → `sudo ./restore.sh`
-* user-level changes (`tasks/user/*`, `config/`, `bin/`, `browsers/`) →
+* user-level changes (`tasks/user/*`, `config/`, `bin/`) →
   `./user-setup.sh`
 
 Both halves are idempotent: backups go to `<kit>/backups/` first, already-
@@ -189,7 +184,7 @@ Two postures, decided automatically at runtime:
 * **Straight into the ISP's router** (public/CGNAT gateway): the link is
   *not trusted*. `stubby` (DoT to Cloudflare + Quad9) listens on
   `127.0.0.1` and every NetworkManager connection is pointed at it, so
-  **all** system DNS is encrypted. Browsers add DoH (NextDNS) on top.
+  **all** system DNS is encrypted.
 * Unknown → treated as untrusted. If it misdetects, set it by hand:
   `echo router > /etc/doris/mode` and rerun task 05.
 
@@ -205,25 +200,10 @@ The rest, regardless of posture:
   to review `sudo aa-logprof` and then enforce.
 * **journald** capped (128M/32M rotate), **debsecan** weekly CVE scan cron.
 * **CPU governor powersave** by default (`~/bin/gov` toggles performance).
-* **/mnt/ramdisk** tmpfs — browsers cache there, so history/cache doesn't
-  touch the disk.
+* **/mnt/ramdisk** tmpfs — general-purpose temp cache.
 
 Everything is reversible; originals back up to `<kit>/backups/` before
 changes (`cp -a` copies, nothing is deleted until you are happy).
-
-## Browsers (the assistant)
-
-At first login the welcome screen offers a browser setup menu (Firefox /
-Helium / both). The assistant (`browsers-setup`) launches each browser for
-you, waits for you to finish the first run and close it, then applies the
-browsah privacy configs (user.js, DDG, DoH secure, GTK theme, ramdisk
-cache) and opens the add-on pages one at a time — watching the profile
-until each extension actually installs. Per-browser done markers
-(`~/.config/doris/browsers-done-firefox`, `-helium`) let you step through
-them one at a time; it never re-asks about what's already installed. For
-Helium, uBlock Origin is built in — the kit offers no Helium extensions
-(KeePassXC-Browser is left for you to add from the Web Store if you want
-it; Helium services stay enabled so the extension proxy works).
 
 ## Welcome screen
 
@@ -236,7 +216,7 @@ also lists the one-time credential chores:
 * **pianobar** — your PANDORA account in `~/.config/pianobar/config`
   (uncomment `password_command`).
 * **weather** — your OpenWeatherMap key in `~/.config/weather_sh.rc`.
-* **keepassxc** (do this first — the browser extension talks to it),
+* **keepassxc**,
   **claws-mail** accounts, **filezilla** sites, **github-desktop** sign-in.
 * **`~/bin/nbp`** needs a gpg secret key set as your default (nbp encrypts to
   your default secret key automatically — no key name hardcoded anymore).
@@ -270,13 +250,12 @@ DORiS/
 ├── packages/             core.list + extras.list
 ├── tasks/
 │   ├── system/           00-check … 06-verify
-│   └── user/             10-config, 11-browsers, 12-welcome
+│   └── user/             10-config, 12-welcome
 ├── config/               ~/.config (tokenized with $USER / $HOSTNAME)
 ├── home/                 dotfiles + films.txt
 ├── bin/                  ~/bin scripts (incl. doris-welcome)
 ├── local/share/          icons, themes, Thunar scripts (→ /usr/share)
 ├── Pictures/backgrounds/ wallpapers
-├── browsers/             browsah configs + the assistant
 ├── hardening/            nftables, stubby, apparmor, journald, udev, systemd, cron, sysctl.d, loginfetch
 └── tools/                selftest.sh, mkwelcome.sh, capture.sh, scrub.sh
 ```

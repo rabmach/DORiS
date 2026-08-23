@@ -48,7 +48,7 @@ case "$MODE" in
     router)
         DNS="$(cat /etc/doris/router-ip 2>/dev/null || echo 192.168.1.1)"
         echo "   * nftables firewall: default-DENY in and out (see /etc/nftables.conf)"
-        echo "   * DNS:  pinned to your trusted router ($DNS). Browser DoH (NextDNS) covers the rest."
+        echo "   * DNS:  pinned to your trusted router ($DNS)."
         ;;
     *) echo "   * nftables firewall: default-DENY in and out (see /etc/nftables.conf)" ;;
 esac
@@ -71,8 +71,7 @@ if [[ -d "$AA_BASE" ]] && command -v grep >/dev/null 2>&1; then
 else
     echo "   * AppArmor: not active on this kernel (see /sys/kernel/security/apparmor)."
 fi
-echo "   * journald capped, debsecan weekly CVE scan, /mnt/ramdisk tmpfs for"
-echo "     browser caches (history/cache never touch the disk)."
+echo "   * journald capped, debsecan weekly CVE scan."
 
 echo
 echo "  TIMERS / SCHEDULED JOBS:"
@@ -88,19 +87,11 @@ echo "   * pianobar  -> edit ~/.config/pianobar/config : set your PANDORA"
 echo "                  username and uncomment password_command. That music"
 echo "                  won't stream itself."
 echo "   * weather   -> put your OpenWeatherMap API key in ~/.config/weather_sh.rc"
-echo "   * keepassxc -> open it and create/open your database. Do this FIRST;"
-echo "                  the browser extension talks to it."
+echo "   * keepassxc -> open it and create/open your database."
 echo "   * claws-mail-> add your email accounts (account wizard)."
 echo "   * filezilla -> save your FTP/SFTP sites."
 echo "   * github-desktop -> sign in."
 echo "   * ~/bin/nbp needs a gpg secret key as your default (see README) before it works."
-
-echo
-echo "  BROWSERS (first login opens the setup menu):"
-echo "   * the welcome terminal offers Firefox / Helium / both. The assistant"
-echo "     LAUNCHES each browser for you, waits for the first run, then applies"
-echo "     the privacy config and walks you through the add-ons."
-echo "   * uBlock Origin is built into Helium; the kit offers no Helium add-ons."
 
 # ── keybinds ─────────────────────────────────────────────────
 echo

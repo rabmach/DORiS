@@ -26,7 +26,7 @@ After installing Debian, you have two users:**root** (the admin)
 and **yourself** (regular user). The system half of DORiS needs root
 privileges — it installs packages, writes to `/etc`, sets up a firewall.
 The per-user half does not — it configures your dotfiles, installs your
-browser assistant, writes to your home directory.
+~/bin scripts, writes to your home directory.
 
 `sudo` lets a regular user run a command as root, without switching users.
 You'll type `sudo ./restore.sh` for the system half, and just
@@ -140,28 +140,18 @@ firewall, configures DNS, enables AppArmor, icons, themes. 10-20
 minutes.
 
 `./user-setup.sh` is the per-user half — dotfiles, ~/bin scripts,
-wallpaper, browser assistant. 5 minutes.
+wallpaper. 5 minutes.
 
 ### 6. Reboot
 
 Both halves done, reboot. Login again. Welcome message: keybinds,
-aliases, scheduled jobs, credential chores. Browser setup assistant
-offers Firefox and Helium.
-
-### 7. Browser setup
-
-Assistant launches the browser, waits for first-run, applies privacy
-configs, opens each extension's add-on page. You click "Add to Firefox,"
-alt-tab back to the terminal — assistant watches the profile until the
-install lands. Per-browser done markers, skip and come back later.
+aliases, scheduled jobs, credential chores.
 
 ## What you get
 
 - Firewall: nftables, default-deny in and out
 - DNS: auto-detected (trusted router or encrypted DoT)
 - AppArmor: complain mode, review reminder
-- Browsers: Firefox + Helium, privacy configs, extensions watched to
-  completion
 - Welcome screen: generated from the kit, never rots
 - 191 curated packages: email, media, dev, monitoring, fonts, themes
 - Keybinds: Win+K (KeePassXC), Win+T (terminal), Win+N (music),

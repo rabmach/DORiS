@@ -48,7 +48,7 @@ if [[ -f "$HARDENING/journald/journald.conf" ]]; then
     log "  journald capped ($(grep SystemMaxUse "$HARDENING/journald/journald.conf" | head -1 | tr -s ' '))."
 fi
 
-# ── 3. /mnt/ramdisk tmpfs (browsers put their caches here) ──
+# ── 3. /mnt/ramdisk tmpfs (general-purpose temp cache) ──
 if ! grep -q '/mnt/ramdisk' /etc/fstab; then
     printf 'tmpfs /mnt/ramdisk tmpfs defaults,noatime,size=3g,mode=1777 0 0\n' | sudo tee -a /etc/fstab >/dev/null
 fi
