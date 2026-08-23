@@ -17,7 +17,7 @@
 ###   * no ~/.local/share/icons|themes references in config/ (system-wide now)
 ###   * every icon referenced by menu.xml exists under local/share/icons
 ###   * the GTK theme/icon names in settings resolve under local/share
-###   * home/films.txt present, package lists parse, browsah + hardening intact
+###   * home/films.txt present, package lists parse, hardening intact
 set -Euo pipefail
 
 DORIS_DIR="${DORIS_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -36,7 +36,7 @@ say "== DORiS kit self-test =="
 
 # ── 0. kit structure ─────────────────────────────────────────
 for d in config bin home local/share/icons local/share/themes local/share/scripts \
-         Pictures browsers hardening packages tools tasks/system tasks/user; do
+         Pictures hardening packages tools tasks/system tasks/user; do
     [[ -d "$d" ]] || hard "missing directory: $d"
 done
 [[ -f restore.sh ]] || hard "missing restore.sh"
@@ -64,7 +64,7 @@ while IFS= read -r -d '' f; do
     if ! bash -n "$f" 2>/dev/null; then
         hard "syntax error in: $f"
     fi
-done < <(find bin tasks tools browsers config -type f -print0 2>/dev/null)
+done < <(find bin tasks tools config -type f -print0 2>/dev/null)
 
 # ── 2. no hardcoded login homes (only the $USER token) ───────
 while IFS= read -r -d '' f; do
@@ -81,7 +81,7 @@ while IFS= read -r -d '' f; do
             hard "hardcoded home path in $f: $hit"
         done < <(grep -oE '/home/[A-Za-z0-9_]+' "$f" 2>/dev/null | sort -u)
     fi
-done < <(find config home bin browsers -type f -print0 2>/dev/null)
+done < <(find config home bin -type f -print0 2>/dev/null)
 
 # ── 3. config must not point at user-local icon/theme dirs ───
 if grep -rqlE "local/share/icons|local/share/themes" config 2>/dev/null; then
@@ -130,10 +130,7 @@ for list in packages/core.list packages/extras.list; do
     [[ "$bad" == 0 ]] && say "  ok: $list parses"
 done
 
-# ── 8. browsah + hardening intact ────────────────────────────
-[[ -f browsers/firefox/configure-firefox.sh ]] || hard "browsers/firefox/configure-firefox.sh missing"
-[[ -f browsers/helium/configure-helium.sh ]] || hard "browsers/helium/configure-helium.sh missing"
-[[ -f browsers/post-login.sh ]] || hard "browsers/post-login.sh missing"
+# ── 8. hardening intact ─────────────────────────────────────
 [[ -f hardening/nftables/nftables.conf ]] || hard "hardening/nftables/nftables.conf missing"
 [[ -f hardening/journald/journald.conf ]] || hard "hardening/journald/journald.conf missing"
 [[ -f hardening/stubby/stubby.yml ]] || soft "hardening/stubby/stubby.yml missing (direct-mode DNS)"

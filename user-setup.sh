@@ -2,7 +2,7 @@
 # 2026 machiner opencode
 ### DORiS - Debian Openbox Restoration Script - 2026
 ### user-setup.sh - PER-USER mode. Restores dotfiles, ~/bin, ~/.config,
-### films.txt, wallpapers, the browsah browser assistant, and installs the first-login
+### films.txt, wallpapers, and installs the first-login
 ### welcome message for ONE user. Safe to run again for the next user on the
 ### same machine (everything backs up first, nothing is deleted).
 ###

@@ -7,10 +7,10 @@
 
 DORiS is a desktop restoration system for any amd64 Debian trixie machine. One
 kit, fully vendored and offline, recreates a hardened, keyboard-driven
-Openbox/X11 desktop from a fresh net-install — plus a security profile, two
-configured browsers, and a first-login welcome that walks you through the
-one-time bits. System setup runs once (`sudo ./restore.sh`); per-user setup
-runs for every human who logs in (`./user-setup.sh`, or `--user bob`).
+Openbox/X11 desktop from a fresh net-install — plus a security profile
+and a first-login welcome that walks you through the one-time bits. System
+setup runs once (`sudo ./restore.sh`); per-user setup runs for every human
+who logs in (`./user-setup.sh`, or `--user bob`).
 
 Everything is idempotent, backs up before it touches a file, and verifies
 itself at the end. The kit is machine-agnostic: vendor firmware is
@@ -22,7 +22,6 @@ the core.
 | **Target** | any amd64 Debian trixie box, offline except `apt` |
 | **Desktop** | Openbox / X11 — lightweight, keyboard-driven |
 | **Two halves** | `restore.sh` (system, once) · `user-setup.sh` (per-user, every user) |
-| **Browsers** | Firefox + Helium, configured and hardened by an interactive assistant |
 | **Security** | nftables default-deny, DNS posture auto-detect, AppArmor, debsecan |
 | **Guarantee** | idempotent, reversible (backups), self-verifying (`06-verify`, `selftest.sh`) |
 
@@ -31,9 +30,8 @@ the core.
 One stick. One button. Offline. Hardened, configured, bespoke desktop. ka-BAM.
 
 The point of DORiS is that a fresh machine comes out the other side *home*:
-every keybind you expect, every alias, the firewall that means it, two
-browsers already set up the way you like them. And it does it again for the
-next user, and the next machine, identically.
+every keybind you expect, every alias, the firewall that means it. And it
+does it again for the next user, and the next machine, identically.
 
 ## The two halves
 
@@ -45,7 +43,7 @@ next user, and the next machine, identically.
 The split exists because one machine often has several humans. The system
 half does everything a machine needs once (repos, packages, firewall, DNS
 strategy, AppArmor). The per-user half does everything a *person* needs
-(dotfiles, `~/bin`, wallpapers, browser setup, welcome). Run the system half
+(dotfiles, `~/bin`, wallpapers, welcome). Run the system half
 once, then the per-user half for each user.
 
 ## How a restore flows
@@ -74,15 +72,11 @@ once, then the per-user half for each user.
         ▼
   reboot → ./user-setup.sh     (per-user half)            per human
    ├─ 10-config     dotfiles, ~/bin, films.txt, $USER/$HOSTNAME tokens
-   ├─ 11-browsers   stage ~/browsah + install ~/bin/browsers-setup
    └─ 12-welcome    welcome.txt, doris-welcome, AppArmor review timer
         │
         ▼
-  first login: welcome screen → browser setup menu →
-        both browsers configured, hardened, add-ons installed
-        │
-        ▼
-  DONE — a workstation you can trust
+  first login: welcome screen →
+        DONE — a workstation you can trust
 ```
 
 ## What each system task does
@@ -103,7 +97,6 @@ once, then the per-user half for each user.
 | task | what | why it exists |
 |------|------|---------------|
 | `10-config` | `config/`→`~/.config`, `bin/`→`~/bin`, `home/`→`~/`, tokens baked in | the person's desktop appears |
-| `11-browsers` | stage `~/browsah`, install the browser assistant | browsers are the daily driver — set up right |
 | `12-welcome` | generate welcome from the kit, install runner, arm timer | the kit documents itself; you learn your keys |
 
 ## The supporting machinery
@@ -135,8 +128,7 @@ nftables default-deny inbound *and* outbound (outbound TCP relaxed to all
 ports — see the FTPS story in the decision journal). DNS: auto-detected
 posture — trusted router, or encrypted stubby when the link isn't trusted.
 AppArmor in complain mode with a review reminder timer. journald capped,
-debsecan weekly CVE scan, browser caches on a ramdisk so history never
-touches disk.
+debsecan weekly CVE scan, ramdisk tmpfs for temp caching.
 
 ## What DORiS is *not* (honest limits)
 

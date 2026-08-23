@@ -33,7 +33,6 @@ export ASSET_ICONS="$DORIS_DIR/local/share/icons"
 export ASSET_THEMES="$DORIS_DIR/local/share/themes"
 export ASSET_SCRIPTS="$DORIS_DIR/local/share/scripts"
 export HARDEN_DIR="$DORIS_DIR/hardening"
-export BROWSERS_DIR="$DORIS_DIR/browsers"
 
 # A reasonable default router DNS when the gateway can't be detected.
 export DEFAULT_ROUTER_DNS="${DNS_SERVER:-192.168.1.1}"

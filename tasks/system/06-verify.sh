@@ -56,6 +56,6 @@ state_set installed "$(date '+%Y-%m-%d %H:%M:%S')"
 log "System restore verified and marker written ($(state_get installed))."
 log "System restore complete - continue NOW with per-user setup (no reboot yet):"
 log "    ./user-setup.sh"
-log "That rebuilds the desktop (menu, keybinds, browsers, welcome screen)."
+log "That rebuilds the desktop (menu, keybinds, welcome screen)."
 log "Then reboot once and you land in the full desktop."
 exit 0

@@ -28,6 +28,7 @@
 | D18 | Watch until installed, don't assume | ClearURLs UUIDs are not what you think |
 | D19 | Per-browser markers | one marker hides a half-set-up browser |
 | D20 | Split: DORiS (agnostic) + DORiSP53s (profile) | machine specifics are overlays, not core |
+| D21 | Remove browser setup and configs from DORiS | users configure their own browsers |
 
 ---
 
@@ -301,12 +302,14 @@ what the kernel is for.
 
 ---
 
-## Browser assistant decisions
+## Browser assistant decisions (historical — removed in D21)
 
-> The browser assistant (launched from the welcome, menu-driven) configures
-> Firefox + Helium, installs add-ons, and hardens `about:config`. Three
-> decisions below were learned the hard way during the trial installs
-> (users `kevin` and `dot`).
+> The browser assistant (launched from the welcome, menu-driven) configured
+> Firefox + Helium, installed add-ons, and hardened `about:config`. These
+> decisions were learned the hard way during the trial installs
+> (users `kevin` and `dot`). The entire browser assistant was removed in
+> D21 — Firefox and Helium are still installed, but users configure them
+> themselves.
 
 ### D17 — Interactive assistant, not a silent watcher
 
@@ -374,8 +377,44 @@ there for when a P53s reinstall happens.
 machines forever); two fully separate kits (drops the shared learning).
 
 **Compromise / cost:** Two repos to keep in sync. But `lib.sh`, task
-skeletons, and the browser/welcome machinery are shared — the delta is small
+skeletons, and the welcome machinery are shared — the delta is small
 and reviewable.
+
+### D21 — Remove browser setup and configs from DORiS
+
+**Decision:** Strip the entire browser assistant, privacy configs, and
+setup menu from DORiS. Firefox and Helium stay in `packages/core.list`
+(installed by the system half), but the per-user half no longer configures
+them. Users run and configure their browsers at their own leisure.
+
+**Why:** The browser assistant was the most complex, bug-prone piece of
+the kit (BUG-006, BUG-008, BUG-010 — three rounds of fixes for a single
+feature). It tightly coupled DORiS to specific browser versions, profile
+paths, and extension UUIDs. Removing it simplifies the per-user half,
+eliminates a class of first-login failures, and lets users configure
+browsers the way they want — not the way the kit assumes.
+
+**What was removed:**
+- `~/DORiS/browsers/` directory (firefox/helium configs, post-login.sh, install.sh)
+- `tasks/user/11-browsers.sh` (the staging task)
+- Browser menu from `bin/doris-welcome` and `tools/mkwelcome.sh`
+- `BROWSERS_DIR` from `lib.sh`
+- All browser references from README, 00-big-picture, 01-the-path
+- Selftest checks for browser files
+
+**What was kept:**
+- Firefox and Helium in `packages/core.list` (installed by system half)
+- `/mnt/ramdisk` tmpfs mount (general-purpose temp cache, not browser-specific)
+- `~/browsah` left untouched (user's own repo, not the kit's)
+- Decision journal entries D03, D14, D17, D18, D19 (historical record)
+
+**Alternatives considered:** Keep the assistant but make it optional
+(keeps the complexity, still breaks on browser updates); replace with a
+simpler script (still couples the kit to browser internals).
+
+**Compromise / cost:** Users who want hardened browser configs need to
+set them up themselves (or use `~/browsah` directly). The kit no longer
+guarantees a specific browser state at first login.
 
 ### D15 — Disable the stock cupsd AppArmor profile
 
