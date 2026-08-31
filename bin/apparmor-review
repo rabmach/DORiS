@@ -5,12 +5,15 @@
 #
 # When the ~1-week observation window ends (reminder fires 2026-08-12):
 #   1. Build allow-lists from real usage:
-#        sudo aa-logprof -p helium-bin
-#        sudo aa-logprof -p sublime_text
-#   2. Review what it proposes (esp. sublime: which paths you edit,
-#      network for Package Control), then enforce:
-#        sudo aa-enforce /etc/apparmor.d/helium-bin
+#        sudo aa-logprof
+#      (no per-profile flag exists — aa-logprof walks every profile in the
+#       audit log; answer the sublime_text questions, (S)kip the rest)
+#   2. Enforce ONLY what has a real profile:
 #        sudo aa-enforce /etc/apparmor.d/sublime-text
+#      helium-bin: LEAVE IN COMPLAIN. The shipped stub profile
+#      (flags=(default_allow) + userns) breaks Helium when enforced
+#      (proven 2026-08-31: browser refused to launch). It needs a real
+#      profile written from aa-logprof output before enforcement.
 #   3. Shrink the audit log cap back to normal:
 #        sudo sed -i 's/^max_log_file = .*/max_log_file = 8/' /etc/audit/auditd.conf
 #        sudo systemctl restart auditd
@@ -40,5 +43,6 @@ done
 echo "$summary"
 
 notify-send -i dialog-information "AppArmor review due" "$summary
-Review + enforce: aa-logprof -p helium-bin / sublime_text, then aa-enforce.
+Review: sudo aa-logprof (no per-profile flag; (S)kip what you don't want).
+Enforce sublime-text only; helium-bin stays in complain (stub breaks Helium).
 Full instructions: ~/bin/apparmor-review" 2>/dev/null || true

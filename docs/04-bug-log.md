@@ -332,3 +332,56 @@ inode/directory xdg-mime handler (no sudo) per BUG-007.
 
 *Filed 2026-08-16 from the first clean wiped-drive net-install — the P53s
 dogfood. Proof is in the restoration.*
+
+## BUG-012 — doris-welcome fires at EVERY login (self-disable never existed)
+
+**Symptom (2026-08-31, after weeks of daily use):** the first-login welcome
+pops up at every subsequent login; the user had to comment the autostart
+line out by hand to stop it.
+
+**Root cause:** `bin/doris-welcome` wrote a `welcome-shown` marker and the
+autostart comment said "shows once, then self-disables" — but nothing
+actually *checked* the marker before acting. Launcher mode unconditionally
+spawned a terminal on every login; `--run` mode showed the welcome whenever
+the marker was missing (which it stays if the window is closed without
+pressing a key) and, even with the marker present, still opened a window
+demanding a keypress just to print "Done. Have a nice day."
+
+**Fix (bin/doris-welcome):** early `exit 0` on marker in BOTH modes —
+the launcher exits before opening any terminal, and `--run` exits before
+printing anything. Also fixed a `a || b && c` precedence bug in the yad
+branch (replaced with a real `if`). The autostart line now stays in place
+permanently and is genuinely inert after the first show: no file to
+re-enable, nothing to comment out, a fresh user still gets the one-time
+welcome. To see the welcome again by choice:
+`rm ~/.config/doris/welcome-shown`.
+
+*Filed 2026-08-31 from weeks of real daily driving — the bugs that survive
+weeks are the ones no test harness thinks to look for.*
+
+## BUG-013 — apparmor-review suggested commands that cannot work
+
+**Symptom (2026-08-31, same weeks-long use):** the review reminder fired;
+running the command it suggested, `aa-logprof -p helium-bin`, errored out.
+
+**Root cause (two bugs in one):**
+  1. `aa-logprof` has no `-p`/profile-selection flag — it walks every
+     profile found in the audit log and you (S)kip the ones you don't
+     want. The kit invented a flag and printed it in three places
+     (bin/apparmor-review header + notification, the sublime-text profile
+     header).
+  2. The guidance said to enforce `helium-bin` — but helium-bin ships as a
+     6-line `flags=(default_allow)` + `userns` stub attached to
+     /opt/helium/helium. Enforcing it on a live box (2026-08-31) made
+     Helium un-launchable; the browser needs real rules (SUID
+     chrome-sandbox, namespace dance) that a stub doesn't carry.
+     The user had to flip it back to complain.
+
+**Fix:** all suggested commands now say plain `sudo aa-logprof` ((S)kip
+what you don't want); the enforce step says `sublime-text` ONLY and
+documents the helium-bin keep-in-complain rule with the reason. Same
+wording propagated to tools/mkwelcome.sh (welcome text) and README.
+Enforcing helium-bin returns to the roadmap only when a real profile is
+written from actual aa-logprof output.
+
+*Filed 2026-08-31, same dogfooding round as BUG-012.*

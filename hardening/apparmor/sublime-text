@@ -1,7 +1,9 @@
 # Sublime Text 4 confined profile.
 # Phase 1: loaded in COMPLAIN mode - logs what the app does, blocks nothing.
-# After ~1 week of use: sudo aa-logprof -p sublime_text, review, then
-#   sudo aa-enforce /etc/apparmor.d/sublime-text
+# After ~1 week of use: sudo aa-logprof (no per-profile flag; (S)kip other
+#   profiles), review, then: sudo aa-enforce /etc/apparmor.d/sublime-text
+#   (helium-bin ships as a complain-mode stub — enforcing it breaks Helium;
+#    leave it in complain until a real profile is written).
 #
 # Design decisions for the enforce step (deliberate at that point):
 #  - Reads: no @{HOME} read is pre-granted, so every file you open is logged.

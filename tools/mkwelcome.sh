@@ -64,7 +64,8 @@ if [[ -d "$AA_BASE" ]] && command -v grep >/dev/null 2>&1; then
     if [[ "$AA_TOTAL" -gt 0 ]]; then
         echo "   * AppArmor: ${AA_TOTAL} profiles active (${AA_ENFORCE} enforce, ${AA_COMPLAIN} complain) -"
         echo "     auditd logs denials; review complain-mode profiles with"
-        echo "     ~/bin/apparmor-review, then enforce with sudo aa-enforce."
+        echo "     ~/bin/apparmor-review. Enforce real profiles only with"
+        echo "     sudo aa-enforce (helium-bin ships as a stub: keep complain)."
     else
         echo "   * AppArmor: module present but no profiles loaded yet."
     fi
