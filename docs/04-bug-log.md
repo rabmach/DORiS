@@ -385,3 +385,31 @@ Enforcing helium-bin returns to the roadmap only when a real profile is
 written from actual aa-logprof output.
 
 *Filed 2026-08-31, same dogfooding round as BUG-012.*
+
+### BUG-013 addendum — enforce experiment (2026-08-31, live box, fully reversible)
+
+Method: `aa-enforce helium-bin` → launch `/opt/helium/helium` → observe →
+`aa-complain` back. Two-direction proof.
+
+| mode | result |
+|------|--------|
+| enforce | dies within 8 s. stderr: `error while loading shared libraries: libdl.so.2: cannot open shared object file: Permission denied` |
+| complain | launches fine (8 s survival check), test instance closed after |
+
+Two findings worth keeping:
+
+1. **No AVC records exist for the enforce failure.** The kernel never
+   "killed" anything — ld.so's `open()` of libdl.so.2 returned EACCES and
+   the loader exited cleanly. A silent clean exit, not a mediation kill:
+   audit-only debugging would have shown *nothing* here. When a confined
+   process "won't launch", read the process's own stderr, not just the
+   audit log.
+2. **Mechanism:** the 6-line stub (`flags=(default_allow)` + `userns` under
+   `abi <abi/4.0>`) does not carry what the early library-load path needs
+   (the execute-mmap `m` permission on shared libs in this kernel's feature
+   set is the prime suspect). `default_allow` is not "a working browser
+   profile"; it's a template. The cure stays the same: build a real
+   profile from `aa-logprof` output before any enforcement.
+
+Box returned to complain; no stray processes; live state identical to
+pre-experiment.
