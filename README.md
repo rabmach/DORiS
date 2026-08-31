@@ -197,8 +197,13 @@ The rest, regardless of posture:
   active mode. Inbound stays default-deny.
 * **AppArmor**: profiles installed in **complain mode** (audit only) with
   auditd running; a weekly user timer (`apparmor-review-reminder`) nags you
-  to review `sudo aa-logprof` and then enforce.
-* **journald** capped (128M/32M rotate), **debsecan** weekly CVE scan cron.
+  to review with `sudo aa-logprof` (no per-profile flag — (S)kip what you
+  don't want) and then enforce. Enforce `sublime-text` once reviewed;
+  `helium-bin` ships as a `default_allow` stub that **breaks Helium when
+  enforced** (proven on a live box) — keep it in complain until a real
+  profile is written.
+* **journald** capped (64M/16M rotate, 1 month retention), **debsecan**
+  weekly CVE scan cron.
 * **CPU governor powersave** by default (`~/bin/gov` toggles performance).
 * **/mnt/ramdisk** tmpfs — general-purpose temp cache.
 

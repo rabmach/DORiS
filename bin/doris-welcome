@@ -16,15 +16,17 @@ SELF="$(readlink -f "$0")"
 
 # ── launcher mode: open a real terminal that runs us in --run mode ──
 if [[ "${1:-}" != "--run" ]]; then
+    [[ -f "$MARKER" ]] && exit 0   # already shown once - self-disabled (BUG-012)
     if command -v alacritty >/dev/null 2>&1; then
         alacritty -e bash "$SELF" --run >/dev/null 2>&1 &
     elif command -v xterm >/dev/null 2>&1; then
         xterm -e bash "$SELF" --run >/dev/null 2>&1 &
     elif command -v yad >/dev/null 2>&1; then
         # no terminal to interact in; at least show the welcome text
-        [[ -f "$MARKER" ]] || [[ -s "$WELCOME" ]] \
-            && yad --text-info --filename="$WELCOME" --title="doris welcome" \
-                   --width=760 --height=560 >/dev/null 2>&1 &
+        if [[ ! -f "$MARKER" && -s "$WELCOME" ]]; then
+            yad --text-info --filename="$WELCOME" --title="doris welcome" \
+                --width=760 --height=560 >/dev/null 2>&1 &
+        fi
         touch "$MARKER"
     else
         cat "$WELCOME"
@@ -37,12 +39,17 @@ say() { printf '  %s\n' "$*"; }
 
 # Drain any keystrokes buffered while the desktop/terminal was still starting,
 # so a stale keypress can't answer a prompt the user never saw (BUG-006).
+# Iteration cap: read -t 0 succeeds forever on a pipe at EOF (POLLHUP reads
+# as "available" and consumes nothing) — a tty never trips this, and a
+# hand-run with closed stdin would otherwise spin for good.
 drain_input() {
-    while read -t 0 -n 1 -s -r _ 2>/dev/null; do :; done
+    local n=0
+    while (( n++ < 64 )) && read -t 0 -n 1 -s -r _ 2>/dev/null; do :; done
 }
 
 mkdir -p "$HOME/.config/doris"
-if [[ ! -f "$MARKER" ]]; then
+[[ -f "$MARKER" ]] && exit 0   # shown on a previous login - one and done (BUG-012)
+{
     if [[ -s "$WELCOME" ]]; then
         cat "$WELCOME"
     else
@@ -55,7 +62,7 @@ if [[ ! -f "$MARKER" ]]; then
     read -n1 -r -s _ || true
     echo
     touch "$MARKER"
-fi
+}
 
 echo
 echo "  Done. Have a nice day."
