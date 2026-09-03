@@ -1,5 +1,7 @@
 # DORiS — Debian Openbox Restoration Script
 
+*Built in the open: human-directed, AI-assisted ([opencode](https://github.com/anomalyco/opencode)), human-verified.*
+
 Newcomers don't usually land on Debian + Openbox — that's a choice people make
 after they've been burned by a desktop war, or fallen for the blank-canvas
 minimalism. DORiS won't mint that taste; it will *meet* it, perfectly, the
