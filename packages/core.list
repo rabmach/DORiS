@@ -57,7 +57,10 @@ claws-mail-tools
 claws-mail-vcalendar-plugin
 bogofilter
 lynx
+age
 alacritty
+python3-urwid
+tmux
 keepassxc
 pianobar
 audacious

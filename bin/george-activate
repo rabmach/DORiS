@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# george-activate — turn on the george dashboard at every X login.
+# george ships dormant in DORiS: the ~/.xinitrc line is commented out.
+# This script flips that one switch (idempotent, reversible by re-commenting
+# or by `george-deactivate` habits: just put the # back).
+
+set -Euo pipefail
+
+X="${HOME}/.xinitrc"
+LINE='(sleep 5 && $HOME/bin/george) &'
+
+if [[ ! -f "$X" ]]; then
+    echo "george-activate: no ~/.xinitrc found - nothing to activate."
+    echo "  (startx users only; run 'george' directly in the meantime.)"
+    exit 1
+fi
+
+if grep -qE '^\(sleep 5 && \$?HOME/bin/george\)' "$X"; then
+    echo "george is already active in ~/.xinitrc - nothing to do."
+    echo "  (it starts fullscreen at your next X login; run 'george' right now to try it.)"
+    exit 0
+fi
+
+if grep -qF "# $LINE" "$X"; then
+    sed -i "s|^# $LINE|$LINE|" "$X"
+    echo "george activated: it starts fullscreen at every X login from now on."
+    echo "  want it right now? run: george"
+    echo "  to undo: put the # back at the start of the george line in ~/.xinitrc"
+else
+    # no shipped line (older DORiS or hand-rolled xinitrc): append it, active.
+    printf '\n# --- george: keyboard-first dashboard (remove to deactivate)\n%s\n' "$LINE" >> "$X"
+    echo "george activated (line appended to ~/.xinitrc)."
+fi
