@@ -28,6 +28,11 @@ lxpanel &
 xfce4-clipman &
 redshift-gtk &
 
+# --- george (OPTIONAL): keyboard-first dashboard. Ships dormant.
+#     Activate:  ~/bin/george-activate   (or just remove the '#' below).
+#     Try it:    run 'george' in any terminal.
+# (sleep 5 && $HOME/bin/george) &
+
 # --- The window manager.  Run in the foreground so this script (the X
 #     session leader) stays alive until Openbox exits.
 openbox-session

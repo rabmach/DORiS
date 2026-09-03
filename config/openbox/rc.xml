@@ -1102,6 +1102,11 @@
     <!-- show the manage desktops section in the client-list-(combined-)menu -->
   </menu>
   <applications>
+    <application class="georges">
+      <decor>no</decor>
+      <maximized>true</maximized>
+    </application>
+
     <application role="browser">
       <maximized>true</maximized>
       <decor>no</decor>
