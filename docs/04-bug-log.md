@@ -413,3 +413,31 @@ Two findings worth keeping:
 
 Box returned to complain; no stray processes; live state identical to
 pre-experiment.
+
+### BUG-015 — SUDO_USER trusted in non-root runs (2026-09-04, live box, user "tracy")
+
+**Found by:** the first live doc test — `sudo -iu tracy`, then
+`./user-setup.sh` as tracy. Hard stop: `[ERROR] /home/bk is not writable
+by bk - run once with: sudo ...`.
+
+**Mechanism:** sudo stamps `SUDO_USER=<invoker>` into the environment of
+EVERY command it runs — including `sudo -iu <user>` login shells. The kit
+resolved the target as `CURRENT_USER="${SUDO_USER:-$(whoami)}"`, so a
+`sudo -iu` session carried bk's identity into tracy's run: CURRENT_USER=bk,
+CURRENT_HOME=/home/bk, unwritable by tracy → die. Empirically confirmed:
+`sudo -iu tracy sh -c 'echo $SUDO_USER; id -un'` → `bk` / `tracy`.
+
+The kit had conflated two meanings of sudo:
+  * invoked-via-sudo AS ROOT  → SUDO_USER names the target (correct, needed)
+  * logged-in-AS-user VIA sudo → SUDO_USER is stale garbage (must be ignored)
+
+**Fix (lib.sh):** if we are root, trust SUDO_USER (fallback root); if we
+are not root, trust `whoami` — you ARE the target user, always.
+
+**Fix (user-setup.sh):** `--user` is now root-only; a plain run refuses it
+(exit 2) instead of silently pointing the restore at someone else's home.
+
+**Lesson:** sudo's environment is a note from your PAST self to the ROOT
+shell. A login shell it drops you into is a fresh user with that note
+still in their pocket. Never read the note unless you are the root it
+was written for.

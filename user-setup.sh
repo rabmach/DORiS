@@ -54,6 +54,14 @@ EOF
     esac
 done
 
+# BUG-015 companion: --user is a ROOT path (it points the restore at
+# someone else's home). A plain run IS the target user - honoring --user
+# there would silently restore into another user's home.
+if [[ -n "$TARGET_USER" && "$(id -u)" -ne 0 ]]; then
+    echo "[ERROR] --user needs root:  sudo $0 --user $TARGET_USER   (or run as that user without --user)" >&2
+    exit 2
+fi
+
 # Pin the target user before sourcing lib.sh so CURRENT_USER resolves.
 if [[ -n "$TARGET_USER" ]]; then
     export SUDO_USER="$TARGET_USER"
