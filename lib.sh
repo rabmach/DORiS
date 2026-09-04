@@ -15,7 +15,17 @@ export ERROR_FILE="$DORIS_DIR/restore-errors.log"
 export BACKUP_BASE="$DORIS_DIR/backups"
 export BACKUP_DIR="$BACKUP_BASE/$(date +%Y%m%d-%H%M%S)"
 
-export CURRENT_USER="${SUDO_USER:-$(whoami)}"
+# Resolve the target user. SUDO_USER is only meaningful when we ARE root
+# (sudo ./user-setup.sh --user bob). In a plain run - or a `sudo -iu someone`
+# login shell - we ARE the target user: trust whoami, never the stale
+# SUDO_USER sudo leaves behind (BUG-015, found live by user "tracy",
+# 2026-09-04: sudo -iu tracy carries SUDO_USER=bk, and the kit tried to
+# restore into /home/bk as tracy).
+if [[ "$(id -u)" -eq 0 ]]; then
+    export CURRENT_USER="${SUDO_USER:-root}"
+else
+    export CURRENT_USER="$(whoami)"
+fi
 export CURRENT_HOME
 CURRENT_HOME="$(getent passwd "$CURRENT_USER" | cut -d: -f6 2>/dev/null)"
 [[ -n "$CURRENT_HOME" ]] || CURRENT_HOME="$HOME"
