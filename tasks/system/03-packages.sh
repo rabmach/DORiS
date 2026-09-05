@@ -10,6 +10,8 @@ source "$DORIS_DIR/lib.sh"
 
 header "PACKAGE INSTALLATION"
 
+announce "THE BIG PASS" "The pantry gets stocked: the whole core list in one apt pass, plus the right microcode for this CPU. This is the long stretch - a few gigabytes - so this is the moment to refill the coffee. An already-stocked box skips through in minutes."
+
 CORE_LIST="$DORIS_DIR/packages/core.list"
 [[ -f "$CORE_LIST" ]] || die "packages/core.list not found."
 

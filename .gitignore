@@ -19,3 +19,6 @@ backups/
 *.swp
 *~
 .DS_Store
+
+# the book's why - local until machiner ships it (wondering on need)
+docs/creed.md

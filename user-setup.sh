@@ -124,4 +124,18 @@ if ! $DRY_RUN && [[ -f "$WELCOME" ]]; then
     echo "=============================================="
 fi
 
+# The doc: regenerate the where-it's-at for THIS user, then the true Done
+# moment - the only place the doc is ever announced (machiner's sealed
+# line). Non-fatal: the restore succeeded; a doc that fails to build
+# doesn't undo that.
+if ! $DRY_RUN; then
+    if bash "$DORIS_DIR/tools/gendoc.sh" && [[ -f "$CURRENT_HOME/what-it-is.md" ]]; then
+        echo ""
+        echo "  Done. Now go see what it is - it's sitting in your home directory."
+        echo ""
+    else
+        warn "Doc generation failed (non-fatal)."
+    fi
+fi
+
 exit 0

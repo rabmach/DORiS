@@ -12,6 +12,8 @@ source "$DORIS_DIR/lib.sh"
 
 header "WELCOME + PER-USER TIMERS"
 
+announce "THE WELCOME MAT" "The kit writes you a welcome: the one-time credential tasks listed plain, shown once at first login, never a nag. And an AppArmor review reminder gets armed, so security stays something you look at on purpose - not something you forgot."
+
 USER_STATE_DIR="$DORIS_USER_STATE"
 ensure_dir "$USER_STATE_DIR"
 

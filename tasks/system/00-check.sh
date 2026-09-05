@@ -13,6 +13,8 @@ source "$DORIS_DIR/lib.sh"
 
 header "PREREQUISITES"
 
+announce "THE ONCE-OVER" "Before anything moves, the box gets a look-over: right privileges, network, disk, and the kit proves itself with its own self-test. If something is missing we stop right there and say so - nothing here starts half-ready."
+
 # ── 1. Must run as root ─────────────────────────────────────
 if [[ "$(id -u)" -ne 0 ]]; then
     die "System restore must run as root:  sudo ./restore.sh"

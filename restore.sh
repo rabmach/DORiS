@@ -120,4 +120,10 @@ if ! run_tasks "$DORIS_SYSTEM_DIR"; then
     exit 1
 fi
 
+# The doc: regenerate the where-it's-at for whoever ran this half.
+# NOT announced here - the system half's last word stays ./user-setup.sh.
+if ! $DRY_RUN; then
+    bash "$DORIS_DIR/tools/gendoc.sh" || warn "Doc generation failed (non-fatal)."
+fi
+
 exit 0

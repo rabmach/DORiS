@@ -142,6 +142,35 @@ if [[ -d bin ]]; then
     done < <(find bin -maxdepth 1 -type f -print0)
 fi
 
+# ── 10. the doc: every task speaks (announce calls) ──────────
+# The restore narrates (lib.sh announce) and tools/gendoc.sh builds
+# ~/what-it-is.md from the same lines. One source of truth. A task
+# that can't speak can't teach - and the doc would drift from the
+# restore. Gate: every task carries at least one well-formed announce
+# call (two quoted args, no embedded double quotes - gendoc parses
+# these lines verbatim).
+[[ -f tools/gendoc.sh ]] || hard "tools/gendoc.sh missing (the doc can't be built)"
+[[ -f docs/creed.md ]] || soft "docs/creed.md missing - the doc carries no why"
+if grep -q '^announce()' lib.sh 2>/dev/null; then
+    re='^announce "[^"]+" "[^"]+"$'
+    spoke=0
+    while IFS= read -r -d '' f; do
+        if ! grep -q '^announce "' "$f"; then
+            hard "task never speaks (no announce call): $f"
+            continue
+        fi
+        spoke=$((spoke + 1))
+        while IFS= read -r line; do
+            if ! [[ "$line" =~ $re ]]; then
+                hard "malformed announce line in $f: $line"
+            fi
+        done < <(grep '^announce "' "$f")
+    done < <(find tasks/system tasks/user -name '*.sh' -print0 | sort -z)
+    [[ "$spoke" -gt 0 ]] && say "  ok: $spoke tasks speak"
+else
+    hard "lib.sh has no announce() - the doc's source is missing"
+fi
+
 # ── summary ──────────────────────────────────────────────────
 say ""
 say "  hard: $HARD   warn: $WARN"

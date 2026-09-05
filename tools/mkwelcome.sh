@@ -94,6 +94,12 @@ echo "   * filezilla -> save your FTP/SFTP sites."
 echo "   * github-desktop -> sign in."
 echo "   * ~/bin/nbp needs a gpg secret key as your default (see README) before it works."
 
+echo
+echo "  YOUR DOC - sitting in your home directory, called what-it-is:"
+echo "   * ~/what-it-is.md - what this box is, why the things, how they tie"
+echo "     in. Written plain. Read it whenever; it isn't going anywhere."
+echo "   * it's refreshed every time a restore runs - it stays where it's at."
+
 # ── keybinds ─────────────────────────────────────────────────
 echo
 echo "  HANDY KEYBINDS (from your openbox rc.xml):"

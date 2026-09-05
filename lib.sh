@@ -56,6 +56,36 @@ warn() { echo "  [WARN] $*" | tee -a "$LOG_FILE"; echo "[WARN] $*" >> "$ERROR_FI
 error(){ echo "  [ERROR] $*" | tee -a "$LOG_FILE" >&2; echo "[ERROR] $*" >> "$ERROR_FILE"; }
 die()  { error "$*"; exit 2; }
 
+# ── Announcements ───────────────────────────────────────────
+# The restore speaks: one homey line per task/section — what this is,
+# why it's here — then a skippable beat. Any key moves on early; silence
+# moves on after $DORIS_BEAT seconds (default 3, machiner: start at 3,
+# tune later). A non-tty (scripted/pipe) run skips the beat entirely:
+# nobody is ever stuck. DRY_RUN shows the narration but never waits.
+#
+# The SAME strings are what the doc (~/what-it-is.md) is generated from
+# (tools/gendoc.sh) — the restore's narration, written down. One source
+# of truth: docs can't drift from reality because the docs ARE the restore.
+#
+# Voice rules (machiner, standing): calm over scare; never imply the reader
+# is one mistake from disaster; "already handled"; homey humor and topical
+# is the register; no cussing for effect; DORiS argues FOR its choices,
+# never against other WMs/desktops.
+#
+# IMPORTANT: single line, two quoted args, no double quotes inside either
+# string — tools/gendoc.sh extracts these lines to build the doc.
+DORIS_BEAT="${DORIS_BEAT:-4}"
+announce() {
+    local title="$1" body="$2" _key=""
+    echo ""
+    echo "  ── $title ──"
+    echo "  $body"
+    echo ""
+    if [[ -t 0 && "${DRY_RUN:-false}" != "true" ]]; then
+        read -r -t "$DORIS_BEAT" -n 1 _key 2>/dev/null || true
+    fi
+}
+
 header() {
     echo "" | tee -a "$LOG_FILE"
     echo "==============================================" | tee -a "$LOG_FILE"

@@ -22,6 +22,8 @@ source "$DORIS_DIR/lib.sh"
 
 header "HARDENING & PRIVACY"
 
+announce "THE MEDICINE" "This is the suite that keeps the box calm: logs capped, weekly security scans, AppArmor watching in complain mode, DNS handled right, and a firewall that came closed. Every step backs up first and stays reversible - this is what makes a machine ROBUST, not loud."
+
 DNS_SERVER="$(doris_dns_server)"
 MODE="$(state_get mode)"
 [[ -n "$MODE" ]] || MODE="router"   # task 01 should have run; be safe
@@ -162,6 +164,8 @@ if [[ -d "$HARDENING/apparmor" ]]; then
     # installed by user-setup.sh (task 12), not here.
 fi
 
+announce "THE PHONE LINE" "DNS decides who the box believes. On a trusted home router it pins there; on a public pipe every lookup goes encrypted - stubby, DoT, through 127.0.0.1. Same box, right posture for the road it is on."
+
 # ── 8. DNS ───────────────────────────────────────────────────
 log "Configuring DNS (mode=$MODE, target=$DNS_SERVER)..."
 NM_CHANGED=0
@@ -265,6 +269,8 @@ if ! grep -q "nameserver $DNS_SERVER" /etc/resolv.conf; then
     warn "Expected nameserver $DNS_SERVER in resolv.conf but it is not there."
     warn "Check the NetworkManager connections (nmcli con show) and rerun task 05."
 fi
+
+announce "THE FRONT DOOR" "We firewall because it's good medicine - we don't want things crawling around our box doing nefarious shit causing all kinds of ruckus. Yours came closed and stays that way. Nothing to tend."
 
 # ── 9. nftables default-deny firewall (the lock-down; do last) ─
 if [[ -f "$HARDENING/nftables/nftables.conf" ]]; then

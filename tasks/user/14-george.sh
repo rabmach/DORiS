@@ -12,6 +12,8 @@ export DORIS_DIR="${DORIS_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}"
 source "$DORIS_DIR/lib.sh"
 
 header "GEORGE - the keyboard-first dashboard (installed dormant)"
+
+announce "GEORGE, DORMANT" "The keyboard-first dashboard is cloned, wired, and asleep - one command away (george), but never a default and never a surprise. If you want it at every login, george-activate flips one commented line. Your call; that is the point."
 GEORGE_HOME="$CURRENT_HOME/george"
 GEORGE_BIN="$CURRENT_HOME/bin/george"
 

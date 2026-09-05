@@ -12,6 +12,8 @@ source "$DORIS_DIR/lib.sh"
 
 header "VERIFICATION"
 
+announce "THE PROVE" "Trust, but verify: browsers, openbox, firewall, audit, DNS - each checked for real, and anything wrong is loud about it. Then a marker goes in /etc/doris so a rerun knows the system half has run. When this passes, continue with ./user-setup.sh."
+
 FAILS=0
 
 check() {
