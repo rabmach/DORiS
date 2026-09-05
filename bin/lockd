@@ -30,6 +30,12 @@ NEW_KEY=0
 VFDIR=""           # current verify workspace (trap cleans it on any exit)
 STAGE=""           # current decrypt-restore staging (trap cleans on crash)
 RESTORED=""        # last thing decrypt put back on disk (for --open)
+TMPID=""           # unlocked temp identity + its dir (trap shreds on any
+                   # exit). must be a GLOBAL: the EXIT trap fires after the
+                   # flow functions return, and their locals are gone by
+                   # then (a local tmpid meant the trap always hit
+                   # 'unbound variable' - every run exited rc=1 and the
+                   # unlocked key was never shredded)
 
 say()  { printf '%s\n' "$*"; }
 notify() {  # GUI runs have no stdout - speak through the desktop instead
@@ -84,7 +90,7 @@ unlock_identity() {
     pw=$(yad_form \
         --field="Unlock key passphrase:":H \
         --field="  (confirm):":H \
-        --field="No other options going forward:":CHK) || die "cancelled"
+        --field="No other options going forward:":CHK) || { rm -rf "$wdir"; die "cancelled"; }
     local upw cpw chk
     IFS='|' read -r upw cpw chk <<<"$pw"
     [[ "$upw" == "$cpw" ]] || { shred -uzn1 "$tmpid" 2>/dev/null; rm -rf "$wdir"; die "passphrases do not match"; }
@@ -184,7 +190,11 @@ EOF
 
 do_selftest() {
     local t; t=$(mktemp -d /tmp/lockd-selftest.XXXXXX)
-    trap "shred -uzn1 '$t'/* 2>/dev/null; rm -rf '$t'" EXIT
+    # set +e: the trap runs under errexit, and shred errors on any
+    # directory in its path - without it the trap dies mid-way, rm -rf
+    # never runs, and the failure code REPLACES the test result
+    # (shipped once: PASS on screen, rc=1 to callers, dir leaked)
+    trap "set +e; find '$t' -type f -exec shred -uzn1 {} + 2>/dev/null; rm -rf '$t'" EXIT
     printf 'lockd selftest payload %s\n' "$(date)" > "$t/plain.txt"
     # identity for the test (unencrypted temp; no passphrase machinery)
     AGE_IDENTITY="$t/testkey.txt" age-keygen -o "$t/testkey.txt" >/dev/null 2>&1
@@ -255,12 +265,19 @@ send_offers() {
     esac
 }
 
+cleanup_ids() {  # shred the unlocked temp identity + remove its workdir
+    [[ -n "${TMPID:-}" ]] || return 0
+    shred -uzn1 "$TMPID" 2>/dev/null || true
+    rmdir "$(dirname "$TMPID")" 2>/dev/null || true
+    TMPID=""
+}
+
 do_encrypt() {
     need age; need age-keygen; need xclip
     ensure_key
-    local tmpid; tmpid=$(unlock_identity)
-    trap 'shred -uzn1 "$tmpid" 2>/dev/null; [[ -n "${VFDIR:-}" ]] && rm -rf "${VFDIR}"; [[ -n "${STAGE:-}" ]] && rm -rf "${STAGE}"; VFDIR=""; STAGE=""' EXIT
-    local pub; pub=$(age-keygen -y "$tmpid")
+    TMPID=$(unlock_identity)
+    trap 'cleanup_ids; [[ -n "${VFDIR:-}" ]] && rm -rf "${VFDIR}"; [[ -n "${STAGE:-}" ]] && rm -rf "${STAGE}"; VFDIR=""; STAGE=""' EXIT
+    local pub; pub=$(age-keygen -y "$TMPID")
 
     local paths=("$@")
     if (( ${#paths[@]} == 0 )); then
@@ -305,7 +322,7 @@ do_encrypt() {
         VFDIR="$vdir"
         local vcmp; vcmp="$vdir/verify"        # non-existent: age writes fresh
         local ok=0
-        if age -d -i "$tmpid" -o "$vcmp" "$out" 2>/dev/null; then
+        if age -d -i "$TMPID" -o "$vcmp" "$out" 2>/dev/null; then
             if [[ -d "$p" ]]; then
                 local vext="$vdir/extract"
                 mkdir -p "$vext"
@@ -375,8 +392,8 @@ do_shred() {
 do_decrypt() {
     need age; need age-keygen
     [[ -f "$(identity_path)" ]] || die "no default key to unlock"
-    local tmpid; tmpid=$(unlock_identity)
-    trap 'shred -uzn1 "$tmpid" 2>/dev/null; [[ -n "${VFDIR:-}" ]] && rm -rf "${VFDIR}"; [[ -n "${STAGE:-}" ]] && rm -rf "${STAGE}"; VFDIR=""; STAGE=""' EXIT
+    TMPID=$(unlock_identity)
+    trap 'cleanup_ids; [[ -n "${VFDIR:-}" ]] && rm -rf "${VFDIR}"; [[ -n "${STAGE:-}" ]] && rm -rf "${STAGE}"; VFDIR=""; STAGE=""' EXIT
     local paths=("$@")
     if (( ${#paths[@]} == 0 )); then
         need yad
@@ -402,7 +419,7 @@ do_decrypt() {
             fi
             stage=$(mktemp -d "$(dirname "$p")/.lockd-ex.XXXXXX")
             STAGE="$stage"
-            if ! age -d -i "$tmpid" "$p" 2>/dev/null | tar -xzf - -C "$stage"; then
+            if ! age -d -i "$TMPID" "$p" 2>/dev/null | tar -xzf - -C "$stage"; then
                 yad_err "Restore failed - archive may be corrupt or extraction ran out of space.\nThe .age source is untouched. Partial output removed."
                 rm -rf "$stage"; STAGE=""
                 continue
@@ -433,7 +450,7 @@ do_decrypt() {
             *.age) out="${p%.age}" ;;
             *)     out="${p}.decrypted" ;;
         esac
-        age -d -i "$tmpid" -o "$out" "$p"
+        age -d -i "$TMPID" -o "$out" "$p"
         RESTORED="$out"
         say "decrypted: $p  ->  $out"
     done
