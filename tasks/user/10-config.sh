@@ -10,6 +10,8 @@ export DORIS_DIR="${DORIS_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}"
 source "$DORIS_DIR/lib.sh"
 
 header "PER-USER CONFIGURATION RESTORATION"
+
+announce "YOUR DIGS" "Now it's yours: dotfiles, ~/bin, Thunar scripts, wallpapers, films.txt - restored into your home with every existing file backed up first. Anything that needs your name or this machine's gets stamped at copy time - nothing ships in here from someone else's box."
 log "Restoring for $CURRENT_USER ($CURRENT_HOME)"
 
 # ── ~/.config/ ──────────────────────────────────────────────

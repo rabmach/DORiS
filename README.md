@@ -1,7 +1,5 @@
 # DORiS — Debian Openbox Restoration Script
 
-*Built in the open: human-directed, AI-assisted ([opencode](https://github.com/anomalyco/opencode)), human-verified.*
-
 Newcomers don't usually land on Debian + Openbox — that's a choice people make
 after they've been burned by a desktop war, or fallen for the blank-canvas
 minimalism. DORiS won't mint that taste; it will *meet* it, perfectly, the
@@ -119,7 +117,8 @@ watch the kit work end to end.
 
 4. Reboot. `startx` (or configure auto-login). The first-login welcome
    screen greets you with keybinds, aliases, timers and the one-time
-   credential chores.
+   credential chores. DORiS also creates a handy what-it-is doc for
+   every new user on the box. It's called, *clears throat*, what-it-is.
 
 The kit can live anywhere and DORiS doesn't care: `~/DORiS` from a `git
 clone`, a mounted backup drive (`/mnt/…`), a USB stick, whatever. You just
@@ -163,14 +162,14 @@ file, so a second user — or a re-run — is safe.
 | 13-lockd | wires **lockd** — one-word encryption (age underneath): Thunar right-click family, `*.age` double-click unlock, Apps-menu launcher, **Ctrl+Alt+E** quick-lock. Originals wiped after byte-verification (`--keep` opts out); your key is born on your first run |
 | 14-george | clones **george**, the keyboard-first dashboard — **installed dormant**: it never starts at login until you run `~/bin/george-activate` (or just type `george` to try it) |
 
-## The rabmach family
+## Related
 
 DORiS is the foundation; the handy tools are the family that lives on it. Two ship in the kit:
 
 - **lockd** — one-word file/directory encryption, right-click to keybind. On by default: it's a *function*, not a taste. Standalone repo: [rabmach/lockd](https://github.com/rabmach/lockd) (DORiS embeds a snapshot; the repo is upstream-of-record).
-- **george** — a fullscreen keyboard-first command center (launcher chips, live system panes, built-in tmux terminal, media chips). Installed **dormant** because a dashboard is *taste*: activate with `~/bin/george-activate`, or ignore it entirely — your openbox is untouched until you say otherwise. Standalone repo: [rabmach/george](https://github.com/rabmach/george).
+- **george** — a fullscreen keyboard-first command center (launcher chips, live system panes, built-in tmux terminal, media chips, scratch pad to notes or email). Installed **dormant** because a dashboard is *taste*: activate with `~/bin/george-activate`, or ignore it entirely. Standalone repo: [rabmach/george](https://github.com/rabmach/george).
 
-Others (brenda, nina, RandomLitB) live on their own — clone what you want.
+Others (brenda, nina, RandomLitB) live on their own — clone what you want. brenda can be pretty handy.
 
 ## Applying updates
 
@@ -182,7 +181,7 @@ To apply a kit update, re-run the half that owns the changed task:
 * user-level changes (`tasks/user/*`, `config/`, `bin/`) →
   `./user-setup.sh`
 
-Both halves are idempotent: backups go to `<kit>/backups/` first, already-
+Backups go to `<kit>/backups/` first, already-
 done steps are skipped, and nothing is re-downloaded. If in doubt, run the
 system half too — it re-verifies what matters (task 06) rather than
 wrecking anything.
@@ -229,7 +228,7 @@ The first-login welcome is generated from the kit itself
 (`tools/mkwelcome.sh`): keybinds come out of `config/openbox/rc.xml`,
 aliases out of `home/.bash_aliases`, timers out of `hardening/`. Add a
 keybind or alias, re-run `./user-setup.sh`, and the welcome updates. It
-also lists the one-time credential chores:
+also lists the one-time credential chores that you may ignore completely:
 
 * **pianobar** — your PANDORA account in `~/.config/pianobar/config`
   (uncomment `password_command`).
@@ -279,7 +278,7 @@ DORiS/
 ```
 
 `$USER` and `$HOSTNAME` are baked into config files at restore time; executables
-resolve `$HOME` at runtime, so the kit ships no hardcoded usernames or hostnames
+resolve `$HOME` in config files at runtime, so the kit ships no hardcoded usernames or hostnames
 (hostnames change between installs — they're tokenized, not captured).
 `tools/selftest.sh` checks that before every restore (and you can run it by hand).
 
@@ -289,7 +288,7 @@ resolve `$HOME` at runtime, so the kit ships no hardcoded usernames or hostnames
   session and warns, then stays X11.
 * **amd64 Debian trixie only** — that's the supported surface, on purpose for right now.
 * **Opinionated by design** — it recreates this way of computing, not a menu
-  of desktop choices. Your keys, your panel, your wallpapers.
+  of desktop choices. Your keys, your panel, your wallpapers, a config'd reliable setup.
 * **Outbound firewall is all-TCP** — FTPS passive data channels negotiate
   their port *inside* TLS, so they can't be allowlisted; filtering is
   enforced at the DNS layer instead (decision journal, D11).

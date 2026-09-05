@@ -17,6 +17,8 @@ source "$DORIS_DIR/lib.sh"
 
 header "SYSTEM TWEAKS"
 
+announce "THE SMALL COURTESIES" "A tty login banner that tells you where you are, a boot that lands at a login and then walks you into the desktop, and Ctrl+Alt+Backspace as the big escape hatch. Small things - but they are the difference between a machine and digs."
+
 # ── 1. loginfetch: regenerate /etc/issue on every tty login ──
 # BUG-002 fix: this referenced $HARDENING (undefined here - each task runs as
 # its own bash process; it's a local alias inside 05-hardening.sh only), so
@@ -73,6 +75,8 @@ else
     fi
     log "  Ctrl+Alt+Backspace kill-X enabled (applies on next boot)."
 fi
+
+announce "THE POP-UP" "On this Debian, notify-send sits silent until a notification daemon autostarts with your desktop. I found that out the hard way, in an Ubuntu forum, at some ungodly hour. Your box already knows."
 
 # ── 5. notification-daemon autostart (notify-send needs it in X) ─
 # Without this, notify-send (used by ~/bin/frank etc.) silently does nothing

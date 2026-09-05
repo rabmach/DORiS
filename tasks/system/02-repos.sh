@@ -14,6 +14,8 @@ source "$DORIS_DIR/lib.sh"
 
 header "EXTERNAL REPOSITORIES"
 
+announce "THE KEYRING" "Firefox, Helium, Sublime and GitHub Desktop come from their makers' own repositories, and no key gets trusted on sight: each fingerprint is checked against the known-good value before it installs. A mismatch warns - a flaky key server never bricks a restore."
+
 # wget/curl/gpg may not exist on a bare net install yet.
 if ! command -v wget >/dev/null && ! command -v curl >/dev/null; then
     log "Installing wget curl (needed to fetch repo signing keys)..."

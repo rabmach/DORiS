@@ -15,6 +15,8 @@ source "$DORIS_DIR/lib.sh"
 
 header "SYSTEM-WIDE ICONS + THEMES"
 
+announce "YOUR LOOK" "Icons and themes land system-wide, so even apps running as root wear the same clothes - and Thunar takes the file-manager crown at the system level. Check-then-skip: a rerun touches only what changed. The desktop already feels like yours before you touch it."
+
 if [[ ! -d "$ASSET_ICONS" ]] && [[ ! -d "$ASSET_THEMES" ]]; then
     warn "No local theme/icon assets found. Skipping."
     exit 0

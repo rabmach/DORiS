@@ -14,6 +14,8 @@ export DORIS_DIR="${DORIS_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}"
 source "$DORIS_DIR/lib.sh"
 
 header "LOCKD - one-word encryption (age underneath)"
+
+announce "THE LOCK" "lockd gets wired in: right-click encrypt, double-click unlock, Ctrl+Alt+E. The script proves itself before any wiring (its own selftest, hard stop on fail), and the key is never born here - it happens on your first run, so the passphrase is yours alone."
 LOCKD_BIN="$CURRENT_HOME/bin/lockd"
 
 if [[ ! -x "$LOCKD_BIN" ]]; then

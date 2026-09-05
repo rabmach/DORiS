@@ -19,6 +19,8 @@ source "$DORIS_DIR/lib.sh"
 
 header "CONNECTION / DNS STRATEGY"
 
+announce "THE ROAD" "One question: is the gateway a trusted home router or a public ISP pipe? The answer goes in the kit's mode file and everything downstream reads it - pinned to the router at home, fully encrypted on the open road."
+
 MODE="$(detect_connection)"
 GW="$(detect_gateway)"
 
