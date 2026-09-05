@@ -5,8 +5,9 @@
 #
 # DNS strategy follows /etc/doris/mode written by task 01:
 #   router  -> trusted LAN router; DNS pinned to it (plaintext, local).
-#   direct  -> untrusted link; stubby (DoT) listens on 127.0.0.1 and every
-#              connection is pointed at it, so ALL DNS is encrypted.
+#   direct  -> untrusted link; DNS rides DHCP (plaintext). The old stubby
+#              (DoT) layer is retired - encryption is the router's or the
+#              browser's job now (NextDNS DoH), not a laptop daemon's.
 #
 # Everything here is reversible:
 #   * /etc/nftables.conf  -> default-deny in AND out; see backup tarball
@@ -164,7 +165,7 @@ if [[ -d "$HARDENING/apparmor" ]]; then
     # installed by user-setup.sh (task 12), not here.
 fi
 
-announce "THE PHONE LINE" "DNS decides who the box believes. On a trusted home router it pins there; on a public pipe every lookup goes encrypted - stubby, DoT, through 127.0.0.1. Same box, right posture for the road it is on."
+announce "THE PHONE LINE" "DNS decides who the box believes. On a trusted home router it pins there; on a public pipe it says so plainly - plaintext DNS on an untrusted link, and the browser's encrypted DNS (DoH) is the honest fix for the road. Same box, right posture for the road it is on."
 
 # ── 8. DNS ───────────────────────────────────────────────────
 log "Configuring DNS (mode=$MODE, target=$DNS_SERVER)..."
@@ -190,33 +191,12 @@ if [[ -L /etc/resolv.conf ]]; then
     NM_CHANGED=1
 fi
 
-# Direct (untrusted) link: encrypted DNS for EVERYTHING via stubby/DoT.
+# Direct (untrusted) link: no laptop-side DNS encryption any more (the
+# stubby/DoT layer is retired). Say so plainly instead of pretending.
 if [[ "$MODE" == "direct" ]]; then
-    log "  direct mode: installing stubby (DoT) and pinning DNS to 127.0.0.1..."
-    apt_install stubby || warn "  stubby install failed - DNS will not be encrypted!"
-
-    STUBBY_CONF="/etc/stubby/stubby.yml"
-    if [[ -f "$HARDENING/stubby/stubby.yml" ]]; then
-        if write_root_file "$HARDENING/stubby/stubby.yml" "$STUBBY_CONF"; then
-            sudo systemctl restart stubby 2>/dev/null || true
-        fi
-    fi
-    sudo systemctl enable --now stubby 2>/dev/null \
-        && log "  stubby active (DoT to Cloudflare + Quad9 on 127.0.0.1:53)." \
-        || warn "  stubby failed to start."
-
-    # Point every non-guest connection at the local stub.
-    while IFS= read -r conn; do
-        [[ -z "$conn" ]] && continue
-        case "$conn" in *[Gg]uest*) log "  Skipping guest profile: $conn"; continue ;; esac
-        cur=$(nmcli -t -f ipv4.dns,ipv4.ignore-auto-dns,ipv6.ignore-auto-dns connection show "$conn" 2>/dev/null || true)
-        if [[ "$cur" == *"127.0.0.1"* && "$cur" == *"ipv4.ignore-auto-dns:yes"* ]]; then
-            log "  $conn already uses stubby DNS - skipped."
-            continue
-        fi
-        sudo nmcli connection modify "$conn" ipv4.dns 127.0.0.1 ipv4.ignore-auto-dns yes ipv6.ignore-auto-dns yes 2>/dev/null \
-            && { log "  $conn -> stubby (127.0.0.1)"; NM_CHANGED=1; }
-    done < <(nmcli -t -f NAME connection show 2>/dev/null || true)
+    warn "  untrusted link: DNS rides DHCP in PLAINTEXT."
+    warn "  For encrypted DNS on open networks use browser-level DoH"
+    warn "  (e.g. Firefox/Chromium -> dns.nextdns.io) or your own DoT client."
 else
     # Trusted LAN: pin to the router.
     if grep -qE '^iface (en[^ ]*|wl[^ ]*) inet (dhcp|static)' /etc/network/interfaces 2>/dev/null; then
@@ -259,13 +239,14 @@ else
 fi
 
 # Enable any wifi radio (base installs often leave it rfkill-blocked).
+announce "WIRELESS" "NetworkManager runs the wires and the airwaves here. Joining a network needs no mouse: open a terminal and run nmtui, arrow keys, activate a connection, done. The panel applet sits in lxpanel too, and the radio is switched on before you thought to ask."
 if nmcli -t device 2>/dev/null | grep -qiE ':wifi:'; then
     sudo nmcli radio wifi on 2>/dev/null || true
     log "  wifi radio enabled for $(nmcli -t device | awk -F: '$2=="wifi" {print $1; exit}')."
 fi
 
 log "  resolv.conf: $(grep nameserver /etc/resolv.conf 2>/dev/null | tr '\n' ' ')"
-if ! grep -q "nameserver $DNS_SERVER" /etc/resolv.conf; then
+if [[ -n "$DNS_SERVER" ]] && ! grep -q "nameserver $DNS_SERVER" /etc/resolv.conf; then
     warn "Expected nameserver $DNS_SERVER in resolv.conf but it is not there."
     warn "Check the NetworkManager connections (nmcli con show) and rerun task 05."
 fi

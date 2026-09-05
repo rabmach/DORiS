@@ -88,7 +88,6 @@ hardening_copy /etc/systemd/journald.conf                  journald/journald.con
 hardening_copy /etc/apparmor.d/helium-bin                  apparmor/helium-bin
 hardening_copy /etc/apparmor.d/helium-bin.dist-default-allow apparmor/helium-bin.dist-default-allow
 hardening_copy /etc/apparmor.d/sublime-text                apparmor/sublime-text
-hardening_copy /etc/stubby/stubby.yml                      stubby/stubby.yml
 mkdir -p "$DORIS_DIR/hardening/auditd"
 sudo cp -a /etc/audit/auditd.conf "$DORIS_DIR/hardening/auditd/" 2>/dev/null || true
 

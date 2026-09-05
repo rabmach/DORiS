@@ -9,8 +9,7 @@
 #   router  = default gateway is RFC1918/link-local/ULA  -> that router is
 #             trusted; DNS is pinned to it (task 05).
 #   direct  = public/CGNAT gateway (cable straight into the ISP's router)
-#             -> the connection is NOT trusted; encrypted DNS is forced
-#             (stubby/DoT via 127.0.0.1) by task 05.
+#             -> the connection is NOT trusted; task 05 says so plainly.
 #   unknown = no default route found -> assume the worst (direct) and warn.
 
 set -Euo pipefail
@@ -38,7 +37,7 @@ case "$MODE" in
     direct)
         state_set mode direct
         info "DIRECT ISP LINK DETECTED - this connection is not trusted."
-        info "Encrypted DNS (stubby/DoT via 127.0.0.1) will be forced in task 05."
+        info "DNS will ride DHCP (plaintext); see task 05 for encrypted-DNS options."
         ;;
     unknown)
         state_set mode direct

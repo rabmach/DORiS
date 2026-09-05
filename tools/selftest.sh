@@ -133,7 +133,6 @@ done
 # ── 8. hardening intact ─────────────────────────────────────
 [[ -f hardening/nftables/nftables.conf ]] || hard "hardening/nftables/nftables.conf missing"
 [[ -f hardening/journald/journald.conf ]] || hard "hardening/journald/journald.conf missing"
-[[ -f hardening/stubby/stubby.yml ]] || soft "hardening/stubby/stubby.yml missing (direct-mode DNS)"
 
 # ── 9. bin scripts all executable-ready (checked after copy) ─
 if [[ -d bin ]]; then

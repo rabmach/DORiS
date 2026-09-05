@@ -180,6 +180,9 @@ va-driver-all
 firmware-linux
 firmware-iwlwifi
 firmware-realtek
+firmware-atheros
+firmware-brcm80211
+firmware-misc-nonfree
 firmware-sof-signed
 firmware-intel-graphics
 

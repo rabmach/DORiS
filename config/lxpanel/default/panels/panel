@@ -2,11 +2,11 @@
 # Use preference dialog in lxpanel to adjust config when you can.
 
 Global {
-  edge=top
+  edge=bottom
   allign=left
   margin=3
   widthtype=percent
-  width=35
+  width=26
   height=26
   transparent=0
   tintcolor=#040404
@@ -19,7 +19,7 @@ Global {
   fontsize=11
   background=0
   backgroundfile=/home/$USER/.config/lxpanel/panel2.png
-  align=left
+  align=right
   monitor=0
   iconsize=28
   autohide=1

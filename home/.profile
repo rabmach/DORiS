@@ -4,6 +4,9 @@
 # see /usr/share/doc/bash/examples/startup-files for examples.
 # the files are located in the bash-doc package.
 
+# Use the generic X11 VCL backend for LibreOffice (bypasses GTK3 placement bugs).
+export SAL_USE_VCLPLUGIN=gen
+
 # the default umask is set in /etc/profile; for setting the umask
 # for ssh logins, install and configure the libpam-umask package.
 #umask 022

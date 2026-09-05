@@ -322,12 +322,13 @@ detect_gateway() {
 }
 
 # Which DNS server the system should be pinned to. router mode pins
-# to the LAN router; direct mode pins to stubby (127.0.0.1, DoT out).
+# to the LAN router; direct mode pins to nothing - DNS rides DHCP
+# (the stubby/DoT layer is retired; untrusted links get a plain warning).
 doris_dns_server() {
     local mode
     mode="$(state_get mode)"
     if [[ "$mode" == "direct" ]]; then
-        echo "127.0.0.1"
+        echo ""
     else
         local gw
         gw="$(state_get router-ip)"

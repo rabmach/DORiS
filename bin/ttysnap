@@ -3,6 +3,7 @@ set -euo pipefail
 
 dest="${HOME}/Pictures/ttysnaps"
 mkdir -p "$dest"
+notify="notify-send --hint=int:transient:1"
 
 for cmd in fbcat convert; do
     command -v "$cmd" >/dev/null 2>&1 || {
@@ -11,10 +12,16 @@ for cmd in fbcat convert; do
     }
 done
 
-vt="$(tty)"
+vt="$(tty 2>/dev/null || true)"
 case "$vt" in
     /dev/tty[0-9]*) vt="${vt#/dev/tty}" ;;
-    *) echo "run from a text console (tty1-6), not: $vt" >&2; exit 1 ;;
+    *) # not on a console fd (detached launch, scripts): name the shot by
+       # whichever console is actually on screen right now
+        vt="$(sudo -n fgconsole 2>/dev/null || true)"
+        [[ "$vt" =~ ^[0-9]+$ ]] || {
+            echo "run from a text console (tty1-6), or with a console active" >&2
+            exit 1
+        } ;;
 esac
 
 [[ -e /dev/fb0 ]] || { echo "no /dev/fb0; framebuffer console not active" >&2; exit 1; }
@@ -24,4 +31,19 @@ base="${dest}/tt${vt}_$(date +%Y%m%d%H%M%S)"
 sudo fbcat > "${base}.ppm"
 convert "${base}.ppm" -quality 90 "${base}.jpg"
 rm -f "${base}.ppm"
+
+# Blank-guard. fbcat reads /dev/fb0, which only fbcon (text consoles)
+# paints - the X server does not use fb0 at all. If the capture came out
+# ~black while the named console's TEXT buffer holds real content, the
+# framebuffer did not match the screen (X owns the active vt, the vt was
+# switched mid-capture, or fbcon is not painting). Delete the lie, say so.
+lit="$(convert "${base}.jpg" -threshold 2% -format "%[fx:mean]" info: 2>/dev/null || echo 1)"
+chars="$(sudo -n cat "/dev/vcs$vt" 2>/dev/null | tr -d '\0' | tr -d '[:space:]' | wc -c)"
+if awk -v l="$lit" -v c="$chars" 'BEGIN { exit !(l < 0.004 && c > 500) }'; then
+    rm -f "${base}.jpg"
+    $notify -t 6000 "ttysnap: snapshot looked blank" \
+        "console may have switched (X owns it) or fbcon is not painting; nothing saved"
+    echo "snapshot looked blank (console may have switched or be blanked); nothing saved" >&2
+    exit 1
+fi
 echo "saved ${base}.jpg"
