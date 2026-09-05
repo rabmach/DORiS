@@ -55,7 +55,7 @@
       D: omnipresent (on all desktops).
   -->
     <keepBorder>no</keepBorder>
-    <animateIconify>no</animateIconify>
+    <animateIconify>yes</animateIconify>
     <font place="ActiveWindow">
       <name>Sans</name>
       <size>11</size>
@@ -159,16 +159,16 @@
     <right>0</right>
   </margins>
   <dock>
-    <position>TopLeft</position>
+    <position>Top</position>
     <!-- (Top|Bottom)(Left|Right|)|Top|Bottom|Left|Right|Floating -->
     <floatingX>0</floatingX>
     <floatingY>0</floatingY>
-    <noStrut>no</noStrut>
+    <noStrut>yes</noStrut>
     <stacking>Above</stacking>
     <!-- 'Above', 'Normal', or 'Below' -->
     <direction>Horizontal</direction>
     <!-- 'Vertical' or 'Horizontal' -->
-    <autoHide>no</autoHide>
+    <autoHide>yes</autoHide>
     <hideDelay>300</hideDelay>
     <!-- in milliseconds (1000 = 1 second) -->
     <showDelay>300</showDelay>
@@ -349,29 +349,18 @@
         <execute>scrot -q 100 '%Y-%m-%d_%s_$wx$h_scrot.jpg' -e 'mv $f ~/scrots/ &amp; gpicview ~/scrots/$f'</execute>
       </action>
     </keybind>
-    <keybind key="W-s">
-      <action name="Execute">
-        <name>screencapture</name>
-        <command>~/bin/scrad</command>
-      </action>
-    </keybind>
     <!--END SCROT-->
-    <!--menus-->
-    <keybind key="W-z">
-      <action name="ShowMenu">
-        <name>root menu</name>
-        <menu>root-menu</menu>
-      </action>
-    </keybind>
     <!--
-    <keybind key="W-space">
-      <action name="ShowMenu">
-        <menu>apps-menu</menu>
+    <keybind key="W-a">
+      <action name="Execute">
+        <startupnotify>
+          <enabled>true</enabled>
+          <name>wicn</name>
+        </startupnotify>
+        <command>audacious [double dash]enqueue https://wicn-ice.streamguys1.com/live-mp3</command>
       </action>
     </keybind>
   -->
-    <!-- end menus-->
-    <!--apps-->
     <keybind key="W-a">
       <action name="Execute">
         <startupnotify>
@@ -399,6 +388,17 @@
       </action>
     </keybind>
   -->
+    <!--  
+  <keybind key="W-b">
+      <action name="Execute">
+        <startupnotify>
+          <enabled>true</enabled>
+          <name>Browsah</name>
+        </startupnotify>
+        <command>firefox -no-remote</command>
+      </action>
+    </keybind>
+-->
     <keybind key="W-b">
       <action name="Execute">
         <startupnotify>
@@ -406,6 +406,12 @@
           <name>Browsah</name>
         </startupnotify>
         <command>helium --password-store=basic</command>
+      </action>
+    </keybind>
+    <keybind key="W-c">
+      <action name="Execute">
+        <name>spoken greeting</name>
+        <command>saygreet</command>
       </action>
     </keybind>
     <keybind key="W-e">
@@ -423,7 +429,8 @@
     <keybind key="W-g">
       <action name="Execute">
         <name>Nexuiz</name>
-        <execute>sh ~/Nexuiz/nexuiz-linux-glx.sh</execute>
+        <!-- <execute>sh ~/Nexuiz/nexuiz-linux-glx.sh</execute> -->
+        <execute>nexuiz</execute>
       </action>
     </keybind>
     <keybind key="W-h">
@@ -435,7 +442,7 @@
     <keybind key="W-i">
       <action name="Execute">
         <name>Icon Browsah</name>
-        <command>/usr/bin/yad-icon-browser</command>
+        <command>yad-icon-browser</command>
       </action>
     </keybind>
     <keybind key="W-k">
@@ -454,6 +461,18 @@
       <action name="Execute">
         <name>mail</name>
         <command>claws-mail</command>
+      </action>
+    </keybind>
+    <keybind key="W-n">
+      <action name="Execute">
+        <name>play music</name>
+        <command>tunes</command>
+      </action>
+    </keybind>
+    <keybind key="W-o">
+      <action name="Execute">
+        <name>reconfigure openbox</name>
+        <command>obr</command>
       </action>
     </keybind>
     <!--
@@ -476,56 +495,28 @@
         <command>~/.config/pianobar/control-pianobar.sh p</command>
       </action>
     </keybind>
-    <!--
-     <keybind key="W-p">
+    <keybind key="W-q">
       <action name="Execute">
-        <command>pithos</command>
+        <name>audio record</name>
+        <command>rec</command>
       </action>
-    </keybind> 
-  -->
+    </keybind>
     <keybind key="W-r">
       <action name="Execute">
         <name>screen recorder, recording</name>
         <command>simplescreenrecorder --start-recording --start-hidden</command>
       </action>
     </keybind>
+        <keybind key="W-s">
+      <action name="Execute">
+        <name>screencapture</name>
+        <command>scrad</command>
+      </action>
+    </keybind>
     <keybind key="W-t">
       <action name="Execute">
         <name>terminal</name>
         <command>x-terminal-emulator</command>
-      </action>
-    </keybind>
-    <keybind key="W-w">
-      <action name="Execute">
-        <name>Writer</name>
-        <command>/usr/bin/lowriter</command>
-      </action>
-    </keybind>
-    <!--
-    <keybind key="A-F2">
-      <action name="Execute">
-        <name>run</name>
-        <command>gmrun</command>
-      </action>
-    </keybind>
--->
-    <keybind key="A-F2">
-      <action name="Execute">
-        <name>run</name>
-        <command>lxpanelctl run</command>
-      </action>
-    </keybind>
-    <!-- custom keybinds for ~/bin scripts (added 2026-08-02) -->
-    <keybind key="W-o">
-      <action name="Execute">
-        <name>reconfigure openbox</name>
-        <command>/home/$USER/bin/obr</command>
-      </action>
-    </keybind>
-    <keybind key="W-q">
-      <action name="Execute">
-        <name>audio record</name>
-        <command>/home/$USER/bin/rec</command>
       </action>
     </keybind>
     <keybind key="W-u">
@@ -540,10 +531,16 @@
         <command>x-terminal-emulator -e /home/$USER/bin/batt -w</command>
       </action>
     </keybind>
+        <keybind key="W-w">
+      <action name="Execute">
+        <name>Writer</name>
+        <command>/usr/bin/lowriter</command>
+      </action>
+    </keybind>
     <keybind key="W-x">
       <action name="Execute">
         <name>kill tunes</name>
-        <command>/home/$USER/bin/killtunes</command>
+        <command>killtunes</command>
       </action>
     </keybind>
     <keybind key="W-y">
@@ -552,16 +549,21 @@
         <command>x-terminal-emulator -e /home/$USER/bin/myip</command>
       </action>
     </keybind>
-    <keybind key="W-c">
-      <action name="Execute">
-        <name>spoken greeting</name>
-        <command>/home/$USER/bin/saygreet</command>
+    <keybind key="W-z">
+      <action name="ShowMenu">
+        <name>root menu</name>
+        <menu>root-menu</menu>
       </action>
     </keybind>
-    <keybind key="W-n">
+    <keybind key="W-space">
+      <action name="ShowMenu">
+        <menu>apps-menu</menu>
+      </action>
+    </keybind>
+    <keybind key="A-F2">
       <action name="Execute">
-        <name>play music</name>
-        <command>/home/$USER/bin/tunes</command>
+        <name>run</name>
+        <command>lxpanelctl run</command>
       </action>
     </keybind>
     <keybind key="A-c">
@@ -579,16 +581,9 @@
     <keybind key="C-A-n">
       <action name="Execute">
         <name>nag, reminder</name>
-        <command>~/bin/nag-zen</command>
+        <command>nag-zen</command>
       </action>
     </keybind>
-    <!--
-    <keybind key="C-A-c">
-      <action name="Execute">
-        <command>chat</command>
-      </action>
-    </keybind>
-          -->
     <keybind key="C-A-f">
       <action name="Execute">
         <name>freeplane</name>
@@ -604,7 +599,7 @@
     <keybind key="C-A-p">
       <action name="Execute">
         <name>movie picker</name>
-        <command>sh ~/bin/pick.sh</command>
+        <command>pick.sh</command>
       </action>
     </keybind>
     <!--
@@ -667,7 +662,7 @@
     <keybind key="W-a-r">
       <action name="Execute">
         <name>kill screenrecorder</name>
-        <command>killall -9 screenrecorder</command>
+        <command>pkill -f simplescreenrecorder</command>
       </action>
     </keybind>
     <keybind key="C-A-d" chroot="true">
@@ -714,31 +709,6 @@
       </action>
     </keybind>
     <!-- end keyboard audio mappings -->
-    <!--
-    <keybind key="W-l">
-      <action name="Execute">
-        <startupnotify>
-          <enabled>true</enabled>
-          <name>Lock screen</name>
-        </startupnotify>
-        <command>physlock</command>
-      </action>
-    </keybind>
-    <keybind key="A-F3">
-      <action name="Execute">
-        <startupnotify>
-          <enabled>true</enabled>
-          <name>auto-themer</name>
-        </startupnotify>
-        <command>~/bin/ld-themes</command>
-      </action>
-    </keybind>
-    <keybind key="Print">
-      <action name="Execute">
-        <execute>scrot '%Y-%m-%d_%s_$wx$h_scrot.jpg' -e 'mv $f ~/scrots/ &amp; gpicview ~/scrots/$f'</execute>
-      </action>
-    </keybind>
-  -->
   </keyboard>
   <mouse>
     <dragThreshold>1</dragThreshold>
@@ -1102,14 +1072,13 @@
     <!-- show the manage desktops section in the client-list-(combined-)menu -->
   </menu>
   <applications>
-    <application class="georges">
-      <decor>no</decor>
-      <maximized>true</maximized>
-    </application>
-
     <application role="browser">
       <maximized>true</maximized>
       <decor>no</decor>
+    </application>
+    <application class="georges">
+      <decor>no</decor>
+      <maximized>true</maximized>
     </application>
   </applications>
 </openbox_config>

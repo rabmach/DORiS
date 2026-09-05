@@ -3,10 +3,13 @@
 always_resume_paused=FALSE
 equalizer_active=TRUE
 equalizer_bands=3,4,5,5,5,4,5,3,2,3
+net_buffer_kb=400
+record_stream=0
 
 [audgui]
 clear_song_fields=FALSE
 eq_preset_win=712,252,332,228
+no_confirm_playlist_delete=TRUE
 info_win=539,161,677,409
 
 [filewriter]

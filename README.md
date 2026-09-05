@@ -127,7 +127,10 @@ location, never from a hardcoded path.)
 
 Machine-agnostic by design: vendor firmware (Intel/AMD microcode, VA-API
 drivers) is auto-detected at install time, and hardware-specific extras are
-optional overlays that never touch the core kit.
+optional overlays that never touch the core kit. Wifi works out of the box
+on the common laptop cards — NetworkManager runs the wires and the airwaves,
+firmware for Intel/Realtek/Atheros/Broadcom/MediaTek is in the core list,
+and joining a network is `nmtui` in any terminal (or the panel applet).
 
 DORiS splits into two halves:
 
@@ -149,7 +152,7 @@ file, so a second user — or a re-run — is safe.
 | 02-repos | apt repos: Mozilla (Firefox), Helium, Sublime Text, GitHub Desktop (shiftkey); key fingerprints verified |
 | 03-packages | full core package list (see `packages/core.list`) + stock kernel + vendor microcode (auto-detected) + optional extras |
 | 04-assets | **icons + themes → `/usr/share`** so root apps match; icon caches rebuilt; nothing in `~/.local` |
-| 05-hardening | nftables, DNS (router pin or encrypted stubby), AppArmor, journald caps, debsecan cron, ramdisk tmpfs, CPU governor, sysctl drop-ins (`hardening/sysctl.d/60-doris-*.conf`) |
+| 05-hardening | nftables, DNS (router pin; direct links get a plain warning), AppArmor, journald caps, debsecan cron, ramdisk tmpfs, CPU governor, sysctl drop-ins (`hardening/sysctl.d/60-doris-*.conf`) |
 | 05-tweaks | loginfetch tty banner (dynamic `/etc/issue` on every tty login), Ctrl+Alt+Backspace kill-X, boot to multi-user + tty1 autostart X |
 | 06-verify | confirms the important bits took, writes the install marker |
 
@@ -194,19 +197,20 @@ Two postures, decided automatically at runtime:
   router is trusted — DNS is pinned to it (default `192.168.1.1`, override
   with `DNS_SERVER=…`). Guest wifi profiles are skipped.
 * **Straight into the ISP's router** (public/CGNAT gateway): the link is
-  *not trusted*. `stubby` (DoT to Cloudflare + Quad9) listens on
-  `127.0.0.1` and every NetworkManager connection is pointed at it, so
-  **all** system DNS is encrypted.
+  *not trusted*. DORiS says so plainly: DNS rides DHCP (plaintext) there.
+  For encrypted DNS on the road, use browser-level DoH (e.g.
+  `dns.nextdns.io` in Firefox/Chromium) or your own DoT client — the old
+  stubby (laptop-side DoT daemon) layer is retired.
 * Unknown → treated as untrusted. If it misdetects, set it by hand:
   `echo router > /etc/doris/mode` and rerun task 05.
 
 The rest, regardless of posture:
 
 * **nftables**: default-deny inbound *and* outbound. Outbound allows
-  loopback, ICMP, DHCP, NTP, DNS to private ranges only (or loopback →
-  stubby), mDNS, and all TCP (FTPS/FTP passive data channels need an
-  arbitrary port revealed inside TLS). `nf_conntrack_ftp` covers FTP
-  active mode. Inbound stays default-deny.
+  loopback, ICMP, DHCP, NTP, DNS (family-agnostic), mDNS, and all TCP
+  (FTPS/FTP passive data channels need an arbitrary port revealed inside
+  TLS). `nf_conntrack_ftp` covers FTP active mode. Inbound stays
+  default-deny.
 * **AppArmor**: profiles installed in **complain mode** (audit only) with
   auditd running; a weekly user timer (`apparmor-review-reminder`) nags you
   to review with `sudo aa-logprof` (no per-profile flag — (S)kip what you
@@ -273,7 +277,7 @@ DORiS/
 ├── bin/                  ~/bin scripts (incl. doris-welcome)
 ├── local/share/          icons, themes, Thunar scripts (→ /usr/share)
 ├── Pictures/backgrounds/ wallpapers
-├── hardening/            nftables, stubby, apparmor, journald, udev, systemd, cron, sysctl.d, loginfetch
+├── hardening/            nftables, apparmor, journald, udev, systemd, cron, sysctl.d, loginfetch
 └── tools/                selftest.sh, mkwelcome.sh, capture.sh, scrub.sh
 ```
 

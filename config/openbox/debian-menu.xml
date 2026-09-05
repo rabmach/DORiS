@@ -18,6 +18,11 @@
       </item>
     </menu>
     <menu id='/Debian/Applications/Network' label='Network'>
+      <menu id='/Debian/Applications/Network/Monitoring' label='Monitoring'>
+        <item label='jnettop'>
+          <action name='Execute'><execute>x-terminal-emulator  -T &quot;jnettop&quot; -e sh -c &quot;/usr/bin/su-to-root -c /usr/sbin/jnettop&quot;</execute></action>
+        </item>
+      </menu>
       <menu id='/Debian/Applications/Network/Web Browsing' label='Web Browsing'>
         <item label='Lynx'>
           <action name='Execute'><execute>x-terminal-emulator  -T &quot;Lynx&quot; -e sh -c &quot;lynx&quot;</execute></action>

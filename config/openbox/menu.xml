@@ -2,7 +2,10 @@
 <openbox_menu xmlns="http://openbox.org/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://openbox.org/">
  <menu id="root-menu" label="Openbox 3">
 <!--obamenu for the application goodness -->
+
 <menu id="apps-menu" label="Apps" icon="/usr/share/icons/Dracula/apps/scalable/0ad.svg" execute="~/bin/obamenu.py" />
+
+
          <!--end obamenu for the application goodness -->
  <!--Scrot Menu-->
 <menu id="scrot" label="Scrot" icon="/usr/share/icons/Dracula/apps/scalable/screenie.svg">
@@ -35,6 +38,7 @@
 		</action>
 		</item>
 </menu>
+<!--
 <menu id="pianobar" label="Pianobar" icon="/usr/share/icons/Dracula/apps/scalable/screenie.svg">
   <item label="Play" icon="/usr/share/icons/kora/actions/16/media-play.svg">
       <action name="Execute">
@@ -77,33 +81,33 @@
       </action>
    </item>
    </menu>
+-->
 <!-- end scrot menu -->
 <!-- scripts-->
+<!--
  <menu icon="/usr/share/icons/Dracula/apps/scalable/7596_iexplore.0.svg"  execute="~/bin/procinfo.pl" id="proc-menu" label="Processes"/>
+-->
    <menu icon="/usr/share/icons/Dracula/apps/scalable/7765_winebrowser.0.svg"  execute="~/bin/datemenu.py" id="date-menu" label="Forward"/>
+   <!--
   <menu icon="/usr/share/icons/kora/status/scalable/face-cool.svg"  execute="~/bin/recent.sh" id="recent" label="Recent"/> 
+-->
+  <!--
    <menu icon="/usr/share/icons/Dracula/apps/scalable/7kaa.svg"  execute="~/bin/places-pipemenu" id="places" label="~/"/> 
+-->
  <!-- end scripts -->
 <!-- weather pipemenu -->
 <menu id="weather" label="Weather" icon="/usr/share/icons/Dracula/apps/scalable/org.gnome.Weather.svg" execute="~/bin/weather.sh -o" />
 <!-- end weather pipemenu -->
-<!--
+
 <menu icon="/usr/share/icons/Dracula/apps/scalable/7765_winebrowser.0.svg"   execute="~/.config/openbox/show_ob_keybindings.py" id="showkeys" label="Keybindings"/>
 <seperator/>
--->
+
         <!-- character menu -->
 <menu id="character map" label="Characters" icon="/usr/share/icons/Dracula/apps/scalable/1password.svg">
     <item label="&#224;">
        <action name="Execute">
           <execute>
              xdotool type &#224;
-          </execute>
-       </action>
-    </item>
-    <item label="rock n roll">
-       <action name="Execute">
-          <execute>
-             xdotool type &#92;&#109;&#47;&#32;&#62;&#95;&#60;&#32;&#92;&#109;&#47;
           </execute>
        </action>
     </item>
@@ -333,12 +337,14 @@
     </item>
 </menu>
 <!-- end character menu -->
+<!--
   <item label="Flick Picker" icon="/usr/share/icons/Dracula/apps/scalable/screensaver.svg">
       <action name="Execute">
       <execute>sh ~/bin/pick.sh
       </execute>
       </action>
       </item>
+   -->
  <!-- logout -->
 	<item label="adios" icon="/usr/share/icons/Dracula/apps/scalable/zenmap.svg">
 		<action name="Execute">

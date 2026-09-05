@@ -42,8 +42,8 @@ MODE="$(cat /etc/doris/mode 2>/dev/null || echo unknown)"
 case "$MODE" in
     direct)
         echo "   * nftables firewall: default-DENY in and out (see /etc/nftables.conf)"
-        echo "   * DNS:  encrypted for EVERYTHING (stubby/DoT via 127.0.0.1) -"
-        echo "           your link is untrusted, so no plaintext DNS ever leaves."
+        echo "   * DNS:  rides DHCP on this untrusted link (plaintext) -"
+        echo "           browser-level encrypted DNS (DoH) is the fix for the road."
         ;;
     router)
         DNS="$(cat /etc/doris/router-ip 2>/dev/null || echo 192.168.1.1)"

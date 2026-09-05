@@ -36,10 +36,11 @@ check "debsecan cron installed" test -f /etc/cron.d/debsecan
 
 MODE="$(state_get mode)"
 DNS_TARGET="$(doris_dns_server)"
-if [[ "$MODE" == "direct" ]]; then
-    check "stubby is active (direct mode)" systemctl is-active stubby
+if [[ -n "$DNS_TARGET" ]]; then
+    check "DNS pinned to $DNS_TARGET" bash -c "grep -q 'nameserver $DNS_TARGET' /etc/resolv.conf"
+else
+    check "resolv.conf exists (direct mode: DNS rides DHCP)" test -s /etc/resolv.conf
 fi
-check "DNS pinned to $DNS_TARGET" bash -c "grep -q 'nameserver $DNS_TARGET' /etc/resolv.conf"
 
 # Icon/theme system dirs present (best-effort: skip if kit lacks assets)
 if [[ -d "$ASSET_ICONS" ]]; then

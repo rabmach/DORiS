@@ -29,6 +29,15 @@ else
     warn "Unknown CPU vendor; skipping microcode packages."
 fi
 
+# ── Firmware repo component sanity (wifi/audio firmware lives there) ──
+# A trixie netinst enables non-free-firmware by default; some custom
+# installs don't. Say so plainly BEFORE the big pass, not as a surprise.
+if ! grep -rqs "non-free-firmware" /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null; then
+    warn "non-free-firmware component not found in apt sources."
+    warn "Wifi/audio firmware (iwlwifi, atheros, realtek, sof) will fail to install."
+    warn "Fix: add 'non-free-firmware' to the sources 'deb ... main ...' line, then rerun."
+fi
+
 # ── Optional extras (--extras / DORIS_EXTRAS=1) ──────────────
 if [[ "${EXTRAS:-0}" == "1" ]] && [[ -f "$DORIS_DIR/packages/extras.list" ]]; then
     mapfile -t EXTRA_PKGS < <(grep -vE '^\s*(#|$)' "$DORIS_DIR/packages/extras.list")

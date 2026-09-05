@@ -126,7 +126,8 @@ once, then the per-user half for each user.
 
 nftables default-deny inbound *and* outbound (outbound TCP relaxed to all
 ports — see the FTPS story in the decision journal). DNS: auto-detected
-posture — trusted router, or encrypted stubby when the link isn't trusted.
+posture — trusted router gets the pin; an untrusted link gets a plain
+warning (the stubby/DoT layer is retired; browser DoH is the road fix).
 AppArmor in complain mode with a review reminder timer. journald capped,
 debsecan weekly CVE scan, ramdisk tmpfs for temp caching.
 

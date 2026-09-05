@@ -12,7 +12,7 @@ export VISUAL=nano
 export EDITOR="$VISUAL"
 export PROMPT_COMMAND='LAST_COMMAND_EXIT=$? && history -a && test 127 -eq $LAST_COMMAND_EXIT && head -n -2 $HISTFILE >${HISTFILE}_temp && mv ${HISTFILE}_temp $HISTFILE'
 #export PAGER='less -e'
-export HISTCONTROL=ignoreboth:erasedups:ignorespace
+#export HISTCONTROL=ignoreboth:erasedups #:ignorespace
 export HISTSIZE=5000
 export HISTFILESIZE=10000
 export HISTIGNORE='&:[ ]*:ls:ll:l:la:[bf]g:nap:fetcher:again:cl:burn:apps:wicn:weather:aliases:wr:frank:update:updoogie:deb:killtunes:tunes:hg:upgrade:history:h:cpf:otto:obr:auto:htop:src:clear:sync:cd:cl:exit:mkpwd:pphrase'

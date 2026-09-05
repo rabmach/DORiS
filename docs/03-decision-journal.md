@@ -302,6 +302,38 @@ what the kernel is for.
 
 ---
 
+## DNS posture, revised: stubby retired (2026-09-05)
+
+**Decision:** The direct-mode stubby (DoT to Cloudflare + Quad9 on
+127.0.0.1) layer is removed from the kit. A direct/untrusted link now gets
+a plain warning — DNS rides DHCP in plaintext — and the honest fix for the
+road is browser-level DoH (dns.nextdns.io in Firefox/Chromium) or the
+user's own DoT client.
+
+**Why:** The enforcement point for DNS filtering/privacy moved upstream.
+The house router runs NextDNS and pushes itself via DHCP option 6; the
+router already blocks outbound 853 for LAN clients; every LAN client
+(including this kit's own author's box, post-restore) does plaintext DNS
+to the router and relies on the router's upstream for the encryption part.
+A laptop-side DoT daemon on top of that architecture was dead weight that
+no longer matched what machiner's machine actually runs — and the kit
+ships what the machine runs.
+
+**Alternatives considered:** Keeping stubby for the "untrusted road"
+story (a layer the author's own box no longer runs — the kit would teach
+a posture its author doesn't live); switching direct mode to force
+public DoH resolvers system-wide (fights captive portals and DHCP-pushed
+resolvers — the exact friction the 2026-09-03 DNS-destination-rule removal
+taught us).
+
+**Compromise / cost:** On a genuinely untrusted link, system DNS is
+plaintext until the user enables browser DoH. Stated plainly in task 01,
+task 05, the welcome text, and `06-verify` (which now checks resolv.conf
+existence in direct mode instead of a 127.0.0.1 pin). Honest beats
+theatrical.
+
+---
+
 ## Browser assistant decisions (historical — removed in D21)
 
 > The browser assistant (launched from the welcome, menu-driven) configured
