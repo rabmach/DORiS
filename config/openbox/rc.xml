@@ -350,17 +350,6 @@
       </action>
     </keybind>
     <!--END SCROT-->
-    <!--
-    <keybind key="W-a">
-      <action name="Execute">
-        <startupnotify>
-          <enabled>true</enabled>
-          <name>wicn</name>
-        </startupnotify>
-        <command>audacious [double dash]enqueue https://wicn-ice.streamguys1.com/live-mp3</command>
-      </action>
-    </keybind>
-  -->
     <keybind key="W-a">
       <action name="Execute">
         <startupnotify>
@@ -370,13 +359,6 @@
         <command>audacious --enqueue https://wicn-ice.streamguys1.com/live-mp3</command>
       </action>
     </keybind>
-    <!--
-<keybind key="C-Escape">
-    <action name="Execute">
-        <command>jgmenu_run</command>
-    </action>
-</keybind>
--->
     <!--
     <keybind key="W-b">
       <action name="Execute">
@@ -475,13 +457,6 @@
         <command>obr</command>
       </action>
     </keybind>
-    <!--
-    <keybind key="W-n">
-      <action name="Execute">
-        <command>notable</command>
-      </action>
-    </keybind>
-  -->
     <!--
     <keybind key="W-p">
       <action name="Execute">
@@ -602,27 +577,12 @@
         <command>pick.sh</command>
       </action>
     </keybind>
-    <!--
-    <keybind key="C-A-s">
-      <action name="Execute">
-        <command>/opt/Super\ Productivity/superproductivity</command>
-      </action>
-    </keybind>
-          -->
     <keybind key="C-A-T">
       <action name="Execute">
         <name>mpv, playing</name>
         <command>mpv --shuffle ~/Music</command>
       </action>
     </keybind>
-    <!--
-    <keybind key="C-S-z">
-      <action name="Execute">
-        <name>zotero</name>
-        <command>~/Downloads/zotero/zotero</command>
-      </action>
-    </keybind>
-          -->
     <keybind key="W-a-Home">
       <action name="Execute">
         <name>pianobar - like</name>
