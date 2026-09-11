@@ -170,13 +170,13 @@ fi
 
 # ── admin apps ───────────────────────────────────────────────
 echo
-echo "  HANDY ADMIN / MANAGEMENT APPS (just installed):"
+echo "  HANDY ADMIN / MANAGEMENT APPS:"
 for a in synaptic gparted "nm-connection-editor (network)" "system-config-printer (printing)" \
          seahorse keepassxc filezilla claws-mail github-desktop solaar btop s-tui nvtop vnstat catfish; do
     printf "   * %s\n" "$a"
 done
-echo "   * ~/bin/gov (cpu governor), ~/bin/weather, ~/bin/tunes (pianobar),"
-echo "     ~/bin/nbp (notes backup), ~/bin/sysinfo.sh, ~/bin/nag"
+echo "   * ~/bin/gov (cpu governor), ~/bin/weather, ~/bin/tunes,"
+echo "     ~/bin/nbp (~/secrets make a key), ~/bin/nag-zen"
 
 # ── dad joke ─────────────────────────────────────────────────
 JOKES=(

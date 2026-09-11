@@ -23,6 +23,35 @@
 	<directories/>
 </action>
 <action>
+	<icon>channel-secure</icon>
+	<name>lockd: encrypt (age)</name>
+	<submenu></submenu>
+	<unique-id>1788428549236-1</unique-id>
+	<command>lockd %F</command>
+	<description>one-word encryption: password, pick, verify, wipe (or --keep)</description>
+	<range></range>
+	<patterns>*</patterns>
+	<directories/>
+	<audio-files/>
+	<image-files/>
+	<other-files/>
+	<text-files/>
+	<video-files/>
+</action>
+<action>
+	<icon>channel-secure</icon>
+	<name>lockd: decrypt</name>
+	<submenu></submenu>
+	<unique-id>1788428549236-2</unique-id>
+	<command>lockd -d %F</command>
+	<description>unlock .age files with the default key</description>
+	<range></range>
+	<patterns>*.age</patterns>
+	<other-files/>
+	<text-files/>
+	<video-files/>
+</action>
+<action>
 	<icon>edit-find</icon>
 	<name>Find in this folder</name>
 	<submenu></submenu>
