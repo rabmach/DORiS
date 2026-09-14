@@ -1036,9 +1036,5 @@
       <maximized>true</maximized>
       <decor>no</decor>
     </application>
-    <application class="georges">
-      <decor>no</decor>
-      <maximized>true</maximized>
-    </application>
   </applications>
 </openbox_config>

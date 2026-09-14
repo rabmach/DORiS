@@ -163,16 +163,14 @@ file, so a second user — or a re-run — is safe.
 | 10-config | `config/` → `~/.config`, `bin/` → `~/bin`, `home/` → `~/` (dotfiles + **films.txt**), Thunar scripts, `Pictures/`; `$USER`/`$HOSTNAME` tokens baked in |
 | 12-welcome | generates the first-login welcome from the kit (keybinds, aliases, timers, admin apps, credential nags, dad joke); arms the AppArmor review timer |
 | 13-lockd | wires **lockd** — one-word encryption (age underneath): Thunar right-click family, `*.age` double-click unlock, Apps-menu launcher, **Ctrl+Alt+E** quick-lock. Originals wiped after byte-verification (`--keep` opts out); your key is born on your first run |
-| 14-george | clones **george**, the keyboard-first dashboard — **installed dormant**: it never starts at login until you run `~/bin/george-activate` (or just type `george` to try it) |
 
 ## Related
 
 DORiS is the foundation; the handy tools are the family that lives on it. Two ship in the kit:
 
 - **lockd** — one-word file/directory encryption, right-click to keybind. On by default: it's a *function*, not a taste. Standalone repo: [rabmach/lockd](https://github.com/rabmach/lockd) (DORiS embeds a snapshot; the repo is upstream-of-record).
-- **george** — a fullscreen keyboard-first command center (launcher chips, live system panes, built-in tmux terminal, media chips, scratch pad to notes or email). Installed **dormant** because a dashboard is *taste*: activate with `~/bin/george-activate`, or ignore it entirely. Standalone repo: [rabmach/george](https://github.com/rabmach/george).
 
-Others (brenda, nina, RandomLitB) live on their own — clone what you want. brenda can be pretty handy.
+Others (brenda, nina, RandomLitB, george) live on their own — clone what you want. brenda can be pretty handy; george (keyboard-first dashboard/command center) is all-inclusive at [rabmach/george](https://github.com/rabmach/george).
 
 ## Applying updates
 
