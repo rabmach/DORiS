@@ -72,7 +72,6 @@ sublime-text
 filezilla
 libreoffice
 libreoffice-gtk3
-github-desktop
 solaar
 pavucontrol
 seahorse
@@ -188,9 +187,6 @@ firmware-intel-graphics
 
 # --- hardening (configured in task 05) ---
 nftables
-auditd
-apparmor
-apparmor-utils
 debsecan
 
 # --- utilities ---

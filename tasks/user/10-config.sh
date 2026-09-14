@@ -126,7 +126,7 @@ fi
 
 # ── Keep everything user-owned even when run via sudo ───────
 own_as_user "$CURRENT_HOME/.config" "$CURRENT_HOME/bin" \
-            "$CURRENT_HOME/.local/share/scripts" "$CURRENT_HOME/Pictures" \
+            "$CURRENT_HOME/.local" "$CURRENT_HOME/Pictures" \
             "$CURRENT_HOME/films.txt" "$CURRENT_HOME/.xinitrc" \
             "$CURRENT_HOME/.bashrc" "$CURRENT_HOME/.bash_aliases" \
             "$CURRENT_HOME/.bash_functions" "$CURRENT_HOME/.bashcolors" \

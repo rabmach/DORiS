@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 2026 machiner opencode
 ### part of the DORiS suite of goodness - debian openbox restoration script(s) - 2026
-# 05 - Hardening & privacy (firewall, DNS, apparmor, logs, tweaks)
+# 05 - Hardening & privacy (firewall, DNS, logs, tweaks)
 #
 # DNS strategy follows /etc/doris/mode written by task 01:
 #   router  -> trusted LAN router; DNS pinned to it (plaintext, local).
@@ -12,8 +12,6 @@
 # Everything here is reversible:
 #   * /etc/nftables.conf  -> default-deny in AND out; see backup tarball
 #   * systemd-resolved removed; resolv.conf managed by NetworkManager
-#   * AppArmor profiles installed in COMPLAIN mode (audit only)
-#   * cupsd profile disabled (stock profile breaks printing; see D15)
 #   * journald capped, debsecan cron for security announcements
 #   * CPU governor = powersave
 
@@ -23,7 +21,7 @@ source "$DORIS_DIR/lib.sh"
 
 header "HARDENING & PRIVACY"
 
-announce "THE MEDICINE" "This is the suite that keeps the box calm: logs capped, weekly security scans, AppArmor watching in complain mode, DNS handled right, and a firewall that came closed. Every step backs up first and stays reversible - this is what makes a machine ROBUST, not loud."
+announce "THE MEDICINE" "This is the suite that keeps the box calm: logs capped, weekly security scans, DNS handled right, and a firewall that came closed. Everything else security-wise stays stock Debian - AppArmor runs as the distro ships it. Every step backs up first and stays reversible - this is what makes a machine ROBUST, not loud."
 
 DNS_SERVER="$(doris_dns_server)"
 MODE="$(state_get mode)"
@@ -89,80 +87,6 @@ if compgen -G "$HARDENING/sysctl.d/60-doris-*.conf" >/dev/null; then
             && log "  sysctl $name applied." \
             || warn "  sysctl $name not applied now (still applies at boot)."
     done
-fi
-
-# ── 7. AppArmor (complain mode) + auditd + review reminder ──
-if [[ -d "$HARDENING/apparmor" ]]; then
-    AA_CHANGED=0
-    for f in helium-bin helium-bin.dist-default-allow sublime-text; do
-        if [[ -f "$HARDENING/apparmor/$f" ]]; then
-            write_root_file "$HARDENING/apparmor/$f" "/etc/apparmor.d/$f" && AA_CHANGED=1
-        fi
-    done
-    if [[ "$AA_CHANGED" == "1" ]]; then
-        sudo apparmor_parser -r /etc/apparmor.d/helium-bin /etc/apparmor.d/sublime-text 2>/dev/null || true
-        log "  AppArmor profiles installed (complain mode)."
-    else
-        log "  AppArmor profiles already in place."
-    fi
-
-    # Remove stub profiles for apps that are not installed.
-    # The base apparmor package ships ~90 unconfined/default_allow stubs
-    # for apps that may never exist on this box. Each stub loads into the
-    # kernel for zero benefit. Only touch stubs — never remove real
-    # profiles (complain/enforce) or DORiS-shipped profiles.
-    AA_DISABLED_DIR="/etc/backups/apparmor-disabled"
-    sudo mkdir -p "$AA_DISABLED_DIR"
-    AA_PRUNED=0
-    DORIS_AA_PROFILES="helium-bin helium-bin.dist-default-allow sublime-text"
-    for f in /etc/apparmor.d/*; do
-        [[ -f "$f" ]] || continue
-        bn=$(basename "$f")
-        # Skip DORiS-shipped profiles, abstractions, tunables, ABI, local includes
-        [[ "$bn" == abi || "$bn" == abstractions || "$bn" == tunables \
-            || "$bn" == local || "$bn" == disable || "$bn" == force-complain \
-            || "$bn" == *".d" ]] && continue
-        echo "$DORIS_AA_PROFILES" | grep -qw "$bn" && continue
-        # Only touch unconfined or default_allow stubs
-        grep -qE "flags=\((unconfined|default_allow)\)" "$f" || continue
-        # Extract binary path from profile line
-        bin_path=$(grep -oE 'profile [^ ]+ "?(/[^ "]+"?)' "$f" | grep -oE '/[^ "]+')
-        [[ -z "$bin_path" ]] && continue
-        # If binary exists on disk, skip — app is installed
-        [[ -f "$bin_path" ]] && continue
-        # Binary not found — prune the stub
-        sudo mv "$f" "$AA_DISABLED_DIR/" && AA_PRUNED=$((AA_PRUNED + 1))
-    done
-    if [[ "$AA_PRUNED" -gt 0 ]]; then
-        sudo aa-teardown 2>/dev/null || true
-        sudo /lib/apparmor/apparmor.systemd reload 2>/dev/null || true
-        log "  AppArmor: pruned $AA_PRUNED stub profiles for uninstalled apps."
-    fi
-
-    # Disable the stock cupsd profile. The cups-daemon package ships an
-    # AppArmor profile that is fundamentally incomplete — it blocks every
-    # filter, backend, CGI script, font path, and capability CUPS needs.
-    # Fixing it is whack-a-mole (gs, poppler, fontconfig, PAM, audit_write,
-    # setgid/setuid/dac_read_search/fsetid/kill capabilities, CGI binaries…).
-    # CUPS listens on localhost:631 only and the firewall already controls
-    # egress — the profile is not worth the maintenance tax.
-    if [[ -f /etc/apparmor.d/usr.sbin.cupsd ]] && ! [[ -L /etc/apparmor.d/disable/usr.sbin.cupsd ]]; then
-        sudo aa-disable /usr/sbin/cupsd 2>/dev/null || true
-        log "  AppArmor: cupsd profile disabled (see decision journal D15)."
-    fi
-
-    # auditd must be running for complain-mode profiles to log anywhere.
-    if command -v auditd >/dev/null; then
-        if [[ -f "$HARDENING/auditd/auditd.conf" ]]; then
-            write_root_file "$HARDENING/auditd/auditd.conf" /etc/audit/auditd.conf
-        fi
-        sudo systemctl enable --now auditd.service 2>/dev/null \
-            && log "  auditd active (AppArmor denials land in /var/log/audit/audit.log)." \
-            || warn "auditd failed to start."
-    fi
-
-    # The weekly review reminder is a per-user systemd user timer; it is
-    # installed by user-setup.sh (task 12), not here.
 fi
 
 announce "THE PHONE LINE" "DNS decides who the box believes. On a trusted home router it pins there; on a public pipe it says so plainly - plaintext DNS on an untrusted link, and the browser's encrypted DNS (DoH) is the honest fix for the road. Same box, right posture for the road it is on."

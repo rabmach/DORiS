@@ -20,7 +20,7 @@
 | D10 | mkwelcome generates docs from the kit | docs can't rot if the kit writes them |
 | D11 | nftables deny-out; outbound TCP all-ports | FTPS passive ports are unknowable until TLS |
 | D12 | DNS posture auto-detect | trusted LAN vs direct ISP are different worlds |
-| D13 | AppArmor complain-first, then enforce | audit before you promise |
+| D13 | AppArmor complain-first, then enforce — RETIRED 2026-09-14 | reverted to stock Debian (see D16) |
 | D14 | Browser caches on a ramdisk | history never touches disk |
 | D15 | powersave governor + `gov` toggle | performance on demand, silence the rest of the time |
 | D16 | journald capped + debsecan weekly | small logs, visible CVEs |
@@ -496,3 +496,19 @@ model changes. The disable step is idempotent (checks for existing symlink).
 *This journal is a living document. When a decision gets overturned, don't
 delete the entry — add the new one, and say why the old one was wrong. That
 "why" is the entire point.*
+
+## D16 — AppArmor removed from DORiS (2026-09-14)
+
+DORiS's AppArmor layer was two complain-mode profiles (one of which,
+`helium-bin`, **breaks Helium when enforced** — D13), auditd to log the
+complain denials, a weekly review nag, and stub-pruning code to manage
+the ~90 inert stock profiles. Observation only, blocking nothing, with
+two bug entries (009, 013) already written against the machinery.
+
+Decision: revert to stock Debian. Debian has AppArmor enabled at boot
+since buster; the distro ships what it ships and DORiS adds nothing on
+top. The security posture hangs on nftables + DNS strategy + sysctls +
+debsecan, which stay. Removed: `hardening/apparmor/`, `hardening/auditd/`,
+`apparmor-review-reminder.*` units, `bin/apparmor-review`, the auditd and
+apparmor packages from `core.list`, and all tasks/docs references.
+Less is more; bug surface smaller; new-user restore one nag quieter.

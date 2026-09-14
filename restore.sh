@@ -3,7 +3,7 @@
 ### DORiS - Debian Openbox Restoration Script - 2026
 ### restore.sh - SYSTEM mode. Runs the once-per-machine parts:
 ###   prerequisites, connection/DNS strategy, repos, packages,
-###   system-wide icons+themes, hardening (firewall/DNS/AppArmor),
+###   system-wide icons+themes, hardening (firewall/DNS),
 ###   and a final verification pass.
 ###
 ### Run as root:

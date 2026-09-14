@@ -3,34 +3,34 @@
  <menu id="root-menu" label="Openbox 3">
 <!--obamenu for the application goodness -->
 
-<menu id="apps-menu" label="Apps" icon="/usr/share/icons/Dracula/apps/scalable/0ad.svg" execute="~/bin/obamenu.py" />
+<menu id="apps-menu" label="Apps" icon="/usr/share/icons/kora/apps/scalable/0ad.svg" execute="~/bin/obamenu.py" />
 
 
          <!--end obamenu for the application goodness -->
  <!--Scrot Menu-->
-<menu id="scrot" label="Scrot" icon="/usr/share/icons/Dracula/apps/scalable/screenie.svg">
-      <item label="click and done" icon="/usr/share/icons/Dracula/apps/scalable/screensaver.svg">
+<menu id="scrot" label="Scrot" icon="/usr/share/icons/kora/apps/scalable/screenie.svg">
+      <item label="click and done" icon="/usr/share/icons/kora/apps/scalable/kscreensaver.svg">
 		<action name="Execute">
 		<execute>
 		scrot -q 100 '%Y-%m-%d_$wx$h_%X.jpg' -e 'mv $f ~/scrots/'
 		</execute>
 		</action>
 		</item>
-		<item label="delay 5" icon="/usr/share/icons/Dracula/apps/scalable/shotwell.svg">
+		<item label="delay 5" icon="/usr/share/icons/kora/apps/scalable/shotwell.svg">
 		<action name="Execute">
 		<execute>
 		scrot -q 100  '%Y-%m-%d_$wx$h_%X.jpg' -d 5 -e 'mv $f ~/scrots/'
 		</execute>
 		</action>
 		</item>
-		<item label="Select Area" icon="/usr/share/icons/Dracula/apps/scalable/shutter.svg">
+		<item label="Select Area" icon="/usr/share/icons/kora/apps/scalable/shutter.svg">
 		<action name="Execute">
 		<execute>
 		scrot -q 100  '%Y-%m-%d_$wx$h_%X.jpg' -s -e 'mv $f ~/scrots/'
 		</execute>
 		</action>
 		</item>
-		<item label="screen with 20% thumb" icon="/usr/share/icons/Dracula/apps/scalable/silicon-32.svg">
+		<item label="screen with 20% thumb" icon="/usr/share/icons/kora/apps/scalable/screenie-qt.svg">
 		<action name="Execute">
 		<execute>
 		scrot -q 100  '%Y-%m-%d_$wx$h_%X.jpg' -t 30 -e 'mv $f ~/scrots/'
@@ -39,7 +39,7 @@
 		</item>
 </menu>
 <!--
-<menu id="pianobar" label="Pianobar" icon="/usr/share/icons/Dracula/apps/scalable/screenie.svg">
+<menu id="pianobar" label="Pianobar" icon="/usr/share/icons/kora/apps/scalable/screenie.svg">
   <item label="Play" icon="/usr/share/icons/kora/actions/16/media-play.svg">
       <action name="Execute">
 <command>~/.config/pianobar/control-pianobar.sh p</command>
@@ -85,25 +85,25 @@
 <!-- end scrot menu -->
 <!-- scripts-->
 <!--
- <menu icon="/usr/share/icons/Dracula/apps/scalable/7596_iexplore.0.svg"  execute="~/bin/procinfo.pl" id="proc-menu" label="Processes"/>
+ <menu icon="/usr/share/icons/kora/apps/scalable/7596_iexplore.0.svg"  execute="~/bin/procinfo.pl" id="proc-menu" label="Processes"/>
 -->
-   <menu icon="/usr/share/icons/Dracula/apps/scalable/7765_winebrowser.0.svg"  execute="~/bin/datemenu.py" id="date-menu" label="Forward"/>
+   <menu icon="/usr/share/icons/kora/apps/scalable/7765_winebrowser.0.svg"  execute="~/bin/datemenu.py" id="date-menu" label="Forward"/>
    <!--
   <menu icon="/usr/share/icons/kora/status/scalable/face-cool.svg"  execute="~/bin/recent.sh" id="recent" label="Recent"/> 
 -->
   <!--
-   <menu icon="/usr/share/icons/Dracula/apps/scalable/7kaa.svg"  execute="~/bin/places-pipemenu" id="places" label="~/"/> 
+   <menu icon="/usr/share/icons/kora/apps/scalable/7kaa.svg"  execute="~/bin/places-pipemenu" id="places" label="~/"/> 
 -->
  <!-- end scripts -->
 <!-- weather pipemenu -->
-<menu id="weather" label="Weather" icon="/usr/share/icons/Dracula/apps/scalable/org.gnome.Weather.svg" execute="~/bin/weather.sh -o" />
+<menu id="weather" label="Weather" icon="/usr/share/icons/kora/apps/scalable/com.github.bitseater.weather.svg" execute="~/bin/weather.sh -o" />
 <!-- end weather pipemenu -->
 
-<menu icon="/usr/share/icons/Dracula/apps/scalable/7765_winebrowser.0.svg"   execute="~/.config/openbox/show_ob_keybindings.py" id="showkeys" label="Keybindings"/>
+<menu icon="/usr/share/icons/kora/apps/scalable/7765_winebrowser.0.svg"   execute="~/.config/openbox/show_ob_keybindings.py" id="showkeys" label="Keybindings"/>
 <seperator/>
 
         <!-- character menu -->
-<menu id="character map" label="Characters" icon="/usr/share/icons/Dracula/apps/scalable/1password.svg">
+<menu id="character map" label="Characters" icon="/usr/share/icons/kora/apps/scalable/1password.svg">
     <item label="&#224;">
        <action name="Execute">
           <execute>
@@ -338,7 +338,7 @@
 </menu>
 <!-- end character menu -->
 <!--
-  <item label="Flick Picker" icon="/usr/share/icons/Dracula/apps/scalable/screensaver.svg">
+  <item label="Flick Picker" icon="/usr/share/icons/kora/apps/scalable/kscreensaver.svg">
       <action name="Execute">
       <execute>sh ~/bin/pick.sh
       </execute>
@@ -346,7 +346,7 @@
       </item>
    -->
  <!-- logout -->
-	<item label="adios" icon="/usr/share/icons/Dracula/apps/scalable/zenmap.svg">
+	<item label="adios" icon="/usr/share/icons/kora/apps/scalable/zenmap.svg">
 		<action name="Execute">
 			<command>obsession-logout -p "Beat Feet, Man" -b ~/Pictures/truckin-bnl67.jpg</command>
 		</action>

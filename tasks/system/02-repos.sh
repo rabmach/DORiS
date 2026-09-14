@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 2026 machiner opencode
 ### part of the DORiS suite of goodness - debian openbox restoration script(s) - 2026
-# 02 - External repositories (Mozilla, Helium, Sublime, Shiftkey/GitHub Desktop)
+# 02 - External repositories (Mozilla, Helium, Sublime)
 #
 # Every signing key is fetched, its fingerprint is verified against the
 # known-good value, and only then is it installed. A mismatch warns but
@@ -14,7 +14,7 @@ source "$DORIS_DIR/lib.sh"
 
 header "EXTERNAL REPOSITORIES"
 
-announce "THE KEYRING" "Firefox, Helium, Sublime and GitHub Desktop come from their makers' own repositories, and no key gets trusted on sight: each fingerprint is checked against the known-good value before it installs. A mismatch warns - a flaky key server never bricks a restore."
+announce "THE KEYRING" "Firefox, Helium and Sublime come from their makers' own repositories, and no key gets trusted on sight: each fingerprint is checked against the known-good value before it installs. A mismatch warns - a flaky key server never bricks a restore."
 
 # wget/curl/gpg may not exist on a bare net install yet.
 if ! command -v wget >/dev/null && ! command -v curl >/dev/null; then
@@ -112,20 +112,6 @@ if [[ ! -f /etc/apt/sources.list.d/sublime-text.sources ]]; then
     log "Sublime Text repository added."
 else
     log "Sublime repository already configured. Skipping."
-fi
-
-# ── Shiftkey / GitHub Desktop ────────────────────────────────
-if [[ ! -f /etc/apt/sources.list.d/mwt-desktop.list ]]; then
-    log "Adding GitHub Desktop (Shiftkey) repository..."
-    add_apt_key \
-        "https://mirror.mwt.me/shiftkey-desktop/gpgkey" \
-        "/usr/share/keyrings/mwt-desktop.gpg" \
-        "4E02A356A18314B00A481F067FC979028B1997C1" "GitHub Desktop"
-    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/mwt-desktop.gpg] https://mirror.mwt.me/shiftkey-desktop/deb/ any main" \
-        | sudo tee /etc/apt/sources.list.d/mwt-desktop.list > /dev/null
-    log "GitHub Desktop repository added."
-else
-    log "GitHub Desktop repository already configured. Skipping."
 fi
 
 # ── Refresh ──────────────────────────────────────────────────

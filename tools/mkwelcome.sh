@@ -52,26 +52,6 @@ case "$MODE" in
         ;;
     *) echo "   * nftables firewall: default-DENY in and out (see /etc/nftables.conf)" ;;
 esac
-# AppArmor profile counts, live from sysfs (world-readable, no root needed).
-# Some profiles nest children (e.g. plasmashell//QtWebEngineProcess), so count
-# every mode file, not just top-level dirs.
-AA_BASE=/sys/kernel/security/apparmor/policy/profiles
-if [[ -d "$AA_BASE" ]] && command -v grep >/dev/null 2>&1; then
-    AA_MODES=$(find "$AA_BASE" -name mode 2>/dev/null)
-    AA_TOTAL=$(printf '%s\n' "$AA_MODES" | wc -l)
-    AA_ENFORCE=$(grep -l enforce $AA_MODES 2>/dev/null | wc -l)
-    AA_COMPLAIN=$(grep -l complain $AA_MODES 2>/dev/null | wc -l)
-    if [[ "$AA_TOTAL" -gt 0 ]]; then
-        echo "   * AppArmor: ${AA_TOTAL} profiles active (${AA_ENFORCE} enforce, ${AA_COMPLAIN} complain) -"
-        echo "     auditd logs denials; review complain-mode profiles with"
-        echo "     ~/bin/apparmor-review. Enforce real profiles only with"
-        echo "     sudo aa-enforce (helium-bin ships as a stub: keep complain)."
-    else
-        echo "   * AppArmor: module present but no profiles loaded yet."
-    fi
-else
-    echo "   * AppArmor: not active on this kernel (see /sys/kernel/security/apparmor)."
-fi
 echo "   * journald capped, debsecan weekly CVE scan."
 
 echo
@@ -91,7 +71,6 @@ echo "   * weather   -> put your OpenWeatherMap API key in ~/.config/weather_sh.
 echo "   * keepassxc -> open it and create/open your database."
 echo "   * claws-mail-> add your email accounts (account wizard)."
 echo "   * filezilla -> save your FTP/SFTP sites."
-echo "   * github-desktop -> sign in."
 echo "   * ~/bin/nbp needs a gpg secret key as your default (see README) before it works."
 
 echo
@@ -172,7 +151,7 @@ fi
 echo
 echo "  HANDY ADMIN / MANAGEMENT APPS:"
 for a in synaptic gparted "nm-connection-editor (network)" "system-config-printer (printing)" \
-         seahorse keepassxc filezilla claws-mail github-desktop solaar btop s-tui nvtop vnstat catfish; do
+         seahorse keepassxc filezilla claws-mail solaar btop s-tui nvtop vnstat catfish; do
     printf "   * %s\n" "$a"
 done
 echo "   * ~/bin/gov (cpu governor), ~/bin/weather, ~/bin/tunes,"

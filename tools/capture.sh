@@ -85,10 +85,5 @@ hardening_copy /etc/sysctl.d/60-doris-performance.conf sysctl.d/60-doris-perform
 hardening_copy /etc/systemd/system/cpufreq-governor.service systemd/cpufreq-governor.service
 hardening_copy /etc/cron.d/debsecan                        cron.d/debsecan
 hardening_copy /etc/systemd/journald.conf                  journald/journald.conf
-hardening_copy /etc/apparmor.d/helium-bin                  apparmor/helium-bin
-hardening_copy /etc/apparmor.d/helium-bin.dist-default-allow apparmor/helium-bin.dist-default-allow
-hardening_copy /etc/apparmor.d/sublime-text                apparmor/sublime-text
-mkdir -p "$DORIS_DIR/hardening/auditd"
-sudo cp -a /etc/audit/auditd.conf "$DORIS_DIR/hardening/auditd/" 2>/dev/null || true
 
 echo "== done. run ./tools/scrub.sh next, then review the diff =="

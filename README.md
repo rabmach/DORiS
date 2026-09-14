@@ -136,7 +136,7 @@ DORiS splits into two halves:
 
 | half | script | when | does what |
 |------|--------|------|-----------|
-| **system** | `sudo ./restore.sh` | once per machine | repos, packages, system-wide icons+themes, firewall, DNS strategy, AppArmor, logs, timers |
+| **system** | `sudo ./restore.sh` | once per machine | repos, packages, system-wide icons+themes, firewall, DNS strategy, logs, timers |
 | **per-user** | `sudo ./user-setup.sh` | once per user | dotfiles, `~/bin`, films.txt, wallpapers, first-login welcome |
 
 Run the system half once, then the per-user half for every user who logs
@@ -149,10 +149,10 @@ file, so a second user — or a re-run — is safe.
 |------|------|
 | 00-check | root, amd64, **networking (dies without it)**, Wayland detection (warns, stays X11), kit self-test |
 | 01-connection | **auto-detects** trusted-LAN vs direct-ISP and picks the DNS strategy (see Security) |
-| 02-repos | apt repos: Mozilla (Firefox), Helium, Sublime Text, GitHub Desktop (shiftkey); key fingerprints verified |
+| 02-repos | apt repos: Mozilla (Firefox), Helium, Sublime Text; key fingerprints verified |
 | 03-packages | full core package list (see `packages/core.list`) + stock kernel + vendor microcode (auto-detected) + optional extras |
 | 04-assets | **icons + themes → `/usr/share`** so root apps match; icon caches rebuilt; nothing in `~/.local` |
-| 05-hardening | nftables, DNS (router pin; direct links get a plain warning), AppArmor, journald caps, debsecan cron, ramdisk tmpfs, CPU governor, sysctl drop-ins (`hardening/sysctl.d/60-doris-*.conf`) |
+| 05-hardening | nftables, DNS (router pin; direct links get a plain warning), journald caps, debsecan cron, ramdisk tmpfs, CPU governor, sysctl drop-ins (`hardening/sysctl.d/60-doris-*.conf`) |
 | 05-tweaks | loginfetch tty banner (dynamic `/etc/issue` on every tty login), Ctrl+Alt+Backspace kill-X, boot to multi-user + tty1 autostart X |
 | 06-verify | confirms the important bits took, writes the install marker |
 
@@ -161,7 +161,7 @@ file, so a second user — or a re-run — is safe.
 | task | what |
 |------|------|
 | 10-config | `config/` → `~/.config`, `bin/` → `~/bin`, `home/` → `~/` (dotfiles + **films.txt**), Thunar scripts, `Pictures/`; `$USER`/`$HOSTNAME` tokens baked in |
-| 12-welcome | generates the first-login welcome from the kit (keybinds, aliases, timers, admin apps, credential nags, dad joke); arms the AppArmor review timer |
+| 12-welcome | generates the first-login welcome from the kit (keybinds, aliases, timers, admin apps, credential nags, dad joke) |
 | 13-lockd | wires **lockd** — one-word encryption (age underneath): Thunar right-click family, `*.age` double-click unlock, Apps-menu launcher, **Ctrl+Alt+E** quick-lock. Originals wiped after byte-verification (`--keep` opts out); your key is born on your first run |
 
 ## Related
@@ -209,13 +209,10 @@ The rest, regardless of posture:
   (FTPS/FTP passive data channels need an arbitrary port revealed inside
   TLS). `nf_conntrack_ftp` covers FTP active mode. Inbound stays
   default-deny.
-* **AppArmor**: profiles installed in **complain mode** (audit only) with
-  auditd running; a weekly user timer (`apparmor-review-reminder`) nags you
-  to review with `sudo aa-logprof` (no per-profile flag — (S)kip what you
-  don't want) and then enforce. Enforce `sublime-text` once reviewed;
-  `helium-bin` ships as a `default_allow` stub that **breaks Helium when
-  enforced** (proven on a live box) — keep it in complain until a real
-  profile is written.
+* **AppArmor**: stock Debian default. The distro loads what it ships;
+  DORiS adds no profiles and no auditd — the observation layer earned
+  bo more than it returned (see decision journal D-notice); the security
+  posture hangs on nftables + DNS + sysctls + debsecan.
 * **journald** capped (64M/16M rotate, 1 month retention), **debsecan**
   weekly CVE scan cron.
 * **CPU governor powersave** by default (`~/bin/gov` toggles performance).
@@ -236,7 +233,7 @@ also lists the one-time credential chores that you may ignore completely:
   (uncomment `password_command`).
 * **weather** — your OpenWeatherMap key in `~/.config/weather_sh.rc`.
 * **keepassxc**,
-  **claws-mail** accounts, **filezilla** sites, **github-desktop** sign-in.
+  **claws-mail** accounts, **filezilla** sites.
 * **`~/bin/nbp`** needs a gpg secret key set as your default (nbp encrypts to
   your default secret key automatically — no key name hardcoded anymore).
 
@@ -275,7 +272,7 @@ DORiS/
 ├── bin/                  ~/bin scripts (incl. doris-welcome)
 ├── local/share/          icons, themes, Thunar scripts (→ /usr/share)
 ├── Pictures/backgrounds/ wallpapers
-├── hardening/            nftables, apparmor, journald, udev, systemd, cron, sysctl.d, loginfetch
+├── hardening/            nftables, journald, udev, systemd, cron, sysctl.d, loginfetch
 └── tools/                selftest.sh, mkwelcome.sh, capture.sh, scrub.sh
 ```
 
@@ -294,8 +291,9 @@ resolve `$HOME` in config files at runtime, so the kit ships no hardcoded userna
 * **Outbound firewall is all-TCP** — FTPS passive data channels negotiate
   their port *inside* TLS, so they can't be allowlisted; filtering is
   enforced at the DNS layer instead (decision journal, D11).
-* **AppArmor ships in complain mode** with a review reminder — enforcement is
-  a conscious step after you audit the denials (D13).
+* **AppArmor is stock Debian** — the distro's profiles load as shipped;
+  DORiS adds no profiles and no audit layer (decided 2026-09-14; see the
+  decision journal).
 
 Feedback, ideas, bugs: open an issue, or tell me where you'd have decided
 differently — the [decision journal](docs/03-decision-journal.md) lists every

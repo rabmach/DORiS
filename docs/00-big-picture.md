@@ -22,7 +22,7 @@ the core.
 | **Target** | any amd64 Debian trixie box, offline except `apt` |
 | **Desktop** | Openbox / X11 — lightweight, keyboard-driven |
 | **Two halves** | `restore.sh` (system, once) · `user-setup.sh` (per-user, every user) |
-| **Security** | nftables default-deny, DNS posture auto-detect, AppArmor, debsecan |
+| **Security** | nftables default-deny, DNS posture auto-detect, AppArmor as Debian ships it, debsecan |
 | **Guarantee** | idempotent, reversible (backups), self-verifying (`06-verify`, `selftest.sh`) |
 
 ## The promise
@@ -42,7 +42,7 @@ does it again for the next user, and the next machine, identically.
 
 The split exists because one machine often has several humans. The system
 half does everything a machine needs once (repos, packages, firewall, DNS
-strategy, AppArmor). The per-user half does everything a *person* needs
+strategy). The per-user half does everything a *person* needs
 (dotfiles, `~/bin`, wallpapers, welcome). Run the system half
 once, then the per-user half for each user.
 
@@ -61,10 +61,10 @@ once, then the per-user half for each user.
   sudo ./restore.sh        (system half)                  ~10-20 min
    ├─ 00-check      root? amd64? network? kit self-test   (dies on no-net)
    ├─ 01-connection router vs direct-ISP → DNS mode        (auto)
-   ├─ 02-repos      Mozilla, Helium, Sublime, GitHub Desktop
+   ├─ 02-repos      Mozilla, Helium, Sublime
    ├─ 03-packages   core.list + Intel/AMD microcode + VA-API (auto)
    ├─ 04-assets     icons + themes → /usr/share
-   ├─ 05-hardening  nftables, DNS, AppArmor, journald caps,
+   ├─ 05-hardening  nftables, DNS, journald caps,
    │                ramdisk tmpfs, CPU governor, sysctls
    ├─ 05-tweaks     tty banner, Ctrl+Alt+Backspace, tty1 → startx
    └─ 06-verify     checks it all took → writes install marker
@@ -72,7 +72,7 @@ once, then the per-user half for each user.
         ▼
   reboot → ./user-setup.sh     (per-user half)            per human
    ├─ 10-config     dotfiles, ~/bin, films.txt, $USER/$HOSTNAME tokens
-   └─ 12-welcome    welcome.txt, doris-welcome, AppArmor review timer
+   └─ 12-welcome    welcome.txt, doris-welcome, user timers
         │
         ▼
   first login: welcome screen →
@@ -85,10 +85,10 @@ once, then the per-user half for each user.
 |------|------|---------------|
 | `00-check` | root, amd64, **networking** (hard fail), Wayland warn, kit self-test | die early, don't half-restore |
 | `01-connection` | detect trusted-LAN vs direct-ISP → DNS posture | one kit, two network realities |
-| `02-repos` | Mozilla, Helium, Sublime Text, GitHub Desktop; key fingerprints verified | only trusted, verified sources |
+| `02-repos` | Mozilla, Helium, Sublime Text; key fingerprints verified | only trusted, verified sources |
 | `03-packages` | `packages/core.list` + auto-detected microcode/VA-API | curated set, hardware-aware |
 | `04-assets` | icons + themes → `/usr/share` | root apps match the desktop |
-| `05-hardening` | nftables, DNS, AppArmor, journald caps, debsecan, ramdisk, governor, sysctls | security is part of the restore |
+| `05-hardening` | nftables, DNS, journald caps, debsecan, ramdisk, governor, sysctls | security is part of the restore |
 | `05-tweaks` | tty banner, kill-X, boot to multi-user + tty1 startx | pleasant, keyboard-driven login |
 | `06-verify` | confirms the important bits took, writes marker | the kit proves itself, or fails loudly |
 
@@ -128,7 +128,7 @@ nftables default-deny inbound *and* outbound (outbound TCP relaxed to all
 ports — see the FTPS story in the decision journal). DNS: auto-detected
 posture — trusted router gets the pin; an untrusted link gets a plain
 warning (the stubby/DoT layer is retired; browser DoH is the road fix).
-AppArmor in complain mode with a review reminder timer. journald capped,
+AppArmor runs as stock Debian ships it. journald capped,
 debsecan weekly CVE scan, ramdisk tmpfs for temp caching.
 
 ## What DORiS is *not* (honest limits)

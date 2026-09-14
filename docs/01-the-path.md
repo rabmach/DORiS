@@ -72,7 +72,7 @@ sudo ./restore.sh     # system half — once per machine
 ```
 
 Reboot between them. The system half installs packages, sets up a
-firewall, configures DNS, enables AppArmor. Some of those changes need a
+firewall, configures DNS. Some of those changes need a
 fresh boot to settle. What you may or may not have heard about not needing
 to reboot Linux as much is true, a reboot here is fastest/easiest way to set
 the changes just made.
@@ -136,7 +136,7 @@ sudo ./restore.sh
 ```
 
 `sudo ./restore.sh` is the system half — installs packages, sets up the
-firewall, configures DNS, enables AppArmor, icons, themes. 10-20
+firewall, configures DNS, icons, themes. 10-20
 minutes.
 
 `./user-setup.sh` is the per-user half — dotfiles, ~/bin scripts,
@@ -151,7 +151,6 @@ aliases, scheduled jobs, credential chores.
 
 - Firewall: nftables, default-deny in and out
 - DNS: auto-detected (trusted router or encrypted DoT)
-- AppArmor: complain mode, review reminder
 - Welcome screen: generated from the kit, never rots
 - 191 curated packages: email, media, dev, monitoring, fonts, themes
 - Keybinds: Win+K (KeePassXC), Win+T (terminal), Win+N (music),

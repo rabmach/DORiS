@@ -212,6 +212,8 @@ chown -R "$CURRENT_USER":"$CURRENT_USER" \
     "$CURRENT_HOME/.local/share/applications" \
     "$CURRENT_HOME/.config/Thunar" 2>/dev/null || true
 [[ -f "$RC" ]] && chown "$CURRENT_USER":"$CURRENT_USER" "$RC" 2>/dev/null || true
+[[ -f "$RC.bak-lockd" ]] && chown "$CURRENT_USER":"$CURRENT_USER" "$RC.bak-lockd" 2>/dev/null || true
+[[ -f "$UCA" ]] && chown "$CURRENT_USER":"$CURRENT_USER" "$UCA" "$UCA.bak-lockd" 2>/dev/null || true
 
 log "lockd ready: terminal 'lockd', right-click in Thunar, menu entry, Ctrl+Alt+E."
 log "  originals are wiped after byte-verification (announced rule; --keep opts out)."

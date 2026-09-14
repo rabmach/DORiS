@@ -30,7 +30,7 @@ check "firefox is installed" bash -c "command -v firefox || dpkg -s firefox >/de
 check "helium-bin is installed" bash -c "command -v helium || dpkg -s helium-bin >/dev/null"
 check "openbox is installed" bash -c "command -v openbox"
 check "nftables is active" systemctl is-active nftables
-check "auditd is active" systemctl is-active auditd
+check "nftables rules loaded" nft list ruleset
 check "journald is capped" bash -c "grep -q SystemMaxUse /etc/systemd/journald.conf"
 check "debsecan cron installed" test -f /etc/cron.d/debsecan
 
