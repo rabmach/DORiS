@@ -206,9 +206,7 @@ The rest, regardless of posture:
   (FTPS/FTP passive data channels need an arbitrary port revealed inside
   TLS). `nf_conntrack_ftp` covers FTP active mode. Inbound stays
   default-deny.
-* **AppArmor**: stock Debian default. The distro loads what it ships;
-  DORiS adds no profiles and no auditd — the observation layer earned
-  bo more than it returned (see decision journal D-notice); the security
+* **AppArmor**: reverted back to stock Debian default, the security
   posture hangs on nftables + DNS + sysctls + debsecan.
 * **journald** capped (64M/16M rotate, 1 month retention), **debsecan**
   weekly CVE scan cron.
