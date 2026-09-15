@@ -22,7 +22,6 @@ rfkill
 # --- printing (network printers over mDNS/Bonjour) ---
 cups
 hplip
-system-config-printer
 xsane
 avahi-daemon
 avahi-utils
@@ -35,6 +34,7 @@ lxappearance-obconf
 lxpanel
 thunar
 thunar-archive-plugin
+thunar-media-tags-plugin
 engrampa
 xfce4-clipman
 menu
@@ -154,6 +154,7 @@ ncdu
 duc
 ncal
 net-tools
+jnettop
 tree
 duf
 powertop
