@@ -16,9 +16,6 @@ your pocket. Heh, or, at least I think so. I have been running the <a target="_b
 ![The doris desktop](docs/images/desktop.jpg)
 *The doris desktop — Openbox, keyboard-driven...colorful.*
 
-![First-login welcome](docs/images/welcome.jpg)
-*First-login welcome — generated from the kit itself, so it never rots.*
-
 ## Why DORiS
 
 DORiS is a disposition: a humanist's way of computing, where the machine bends to how you
