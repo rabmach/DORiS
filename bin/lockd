@@ -28,8 +28,9 @@ set -euo pipefail
 CONFIG_DIR="${HOME}/.config/lockd"
 CONFIG="${CONFIG_DIR}/config"
 IDENTITY="${CONFIG_DIR}/identity.txt"
+ONOFFS="${CONFIG_DIR}/oneoffs"     # the receipt book: one-off passphrases
 
-KEEP=0; FAST_RUN=0; FULL_RUN=0; DECRYPT=0; OPEN=0; SHRED_MODE=0
+KEEP=0; FAST_RUN=0; FULL_RUN=0; DECRYPT=0; OPEN=0; SHRED_MODE=0; PASS_MODE=0; INSPECT=0
 FAST_PATH=0        # loaded from config
 NEW_KEY=0
 VFDIR=""           # current verify workspace (trap cleans it on any exit)
@@ -45,8 +46,11 @@ DLG=""             # resolved dialog backend ("" until dlg_backend runs)
 
 say()  { printf '%s\n' "$*"; }
 notify() {  # GUI runs have no stdout - speak through the desktop instead
+    # optional first arg: "-t MS" (notify-send expire timeout, milliseconds)
+    local -a to=()
+    if [[ "${1:-}" == "-t" ]]; then to=(-t "$2"); shift 2; fi
     [[ -n "${DISPLAY:-}" ]] && command -v notify-send >/dev/null \
-        && notify-send --hint=int:transient:1 "lockd" "$*" 2>/dev/null || true
+        && notify-send "${to[@]+${to[@]}}" --hint=int:transient:1 "lockd" "$*" 2>/dev/null || true
 }
 need() { command -v "$1" >/dev/null || die "missing: $1"; }
 
@@ -122,6 +126,43 @@ dlg_form() {
     esac
     if [[ "$out" != *$'\n'* ]]; then return 1; fi   # a form always has >= 2 fields
     printf '%s' "$out"
+}
+
+dlg_note() {  # info window (tty: plain line); best-effort, never fatal
+    dlg_backend
+    case "$DLG" in
+        yad)     yad --title="lockd" --borders=12 --info --text="$*" --width=420 2>/dev/null || true ;;
+        zenity)  zenity --info --title="lockd" --text="$*" 2>/dev/null || true ;;
+        kdialog) kdialog --title lockd --msgbox "$*" 2>/dev/null || true ;;
+        tty)     printf '%b\n' "lockd: $*" >&2 ;;   # stderr: stdout carries form data
+    esac
+}
+
+dlg_creds() {  # passphrase + confirm (+ fastpath flag), with immediate fix-up.
+  # a mismatch or an empty pair does NOT kick you out of the flow: the form
+  # re-shows right away. after three strikes, lockd says the thing:
+  # no, man - you should NOT call her. move on. get a grip. focus.
+  # (figured it will resonate with ~44% of the user base)
+  # -> three lines on stdout: passphrase, confirm, TRUE|FALSE. rc!=0 = give up.
+  local attempt out f upw cpw chk
+  for attempt in 1 2 3; do
+      out=$(dlg_form) || return 1
+      mapfile -t f <<<"$out"
+      upw="${f[0]:-}"; cpw="${f[1]:-}"; chk="${f[2]:-FALSE}"
+      if [[ -n "$upw" && "$upw" == "$cpw" ]]; then
+          printf '%s' "$out"
+          return 0
+      fi
+      if (( attempt < 3 )); then
+          if [[ -z "$upw" ]]; then
+              dlg_note "Empty passphrase. Once more: type it in both lines."
+          else
+              dlg_note "Those two lines did not match. Once more - slow, this time.\n(attempt ${attempt} of 3)"
+          fi
+      fi
+  done
+  dlg_note "No, man - you should NOT call her.\nMove on. Get a grip. And focus."
+  return 1
 }
 
 die() {  # stderr always; GUI backends also get a window
@@ -236,28 +277,79 @@ config_set() {
 # unlock the passphrase-encrypted identity via a pty (age reads
 # passphrases from the terminal only; script(1) provides the terminal).
 # Returns 0 and echoes the temp plaintext-identity path on success.
+# 2026-09-06: mismatch fix-up (dlg_creds) + wrong-passphrase retry (3
+# strikes each) + the creds are unset the moment they are consumed -
+# sometimes a typed passphrase is REAL; it should vanish the instant its
+# work is done. (The earlier tty bug: dlg_note printed to stdout and got
+# captured INTO the form data - the key could be born guarded by the
+# warning text itself. Notes now speak on stderr only.)
+lockd_slam() {  # three strikes; the reminder 44% of us know by heart
+    dlg_note "No, man - you should NOT call her.\nMove on. Get a grip. And focus."
+    return 1
+}
+
 unlock_identity() {
-    local pw wdir tmpid
+    local wdir tmpid attempt out ok=0
     wdir=$(mktemp -d "${TMPDIR:-/tmp}/lockd-id.XXXXXX")
     tmpid="$wdir/id"                       # must NOT exist: age refuses -o over
     chmod 600 "$tmpid" 2>/dev/null || true
-    local out
-    out=$(dlg_form) || { rm -rf "$wdir"; die "cancelled"; }
     local f upw cpw chk
-    mapfile -t f <<<"$out"
-    upw="${f[0]:-}"; cpw="${f[1]:-}"; chk="${f[2]:-FALSE}"
-    [[ "$upw" == "$cpw" ]] || { shred -uzn1 "$tmpid" 2>/dev/null; rm -rf "$wdir"; die "passphrases do not match"; }
-    [[ -n "$upw" ]] || { shred -uzn1 "$tmpid" 2>/dev/null; rm -rf "$wdir"; die "empty passphrase"; }
-    if [[ "$chk" == TRUE ]]; then config_set fast_path 1; fi
     local cmd
     cmd=$(printf 'age -d -o %q %q' "$tmpid" "$(identity_path)")
-    printf '%s\n' "$upw" | script -qfec "$cmd" /dev/null >/dev/null 2>&1 \
-        || { shred -uzn1 "$tmpid" 2>/dev/null; rm -rf "$wdir"; die "wrong passphrase (or no key): unlock failed"; }
+    for attempt in 1 2 3; do
+        out=$(dlg_creds) || { rm -rf "$wdir"; exit 1; }  # dlg_creds already had the last word
+        mapfile -t f <<<"$out"
+        unset out
+        upw="${f[0]:-}"; cpw="${f[1]:-}"; chk="${f[2]:-FALSE}"
+        unset cpw f
+        if [[ "$chk" == TRUE ]]; then config_set fast_path 1; fi
+        unset chk
+        if printf '%s\n' "$upw" | script -qfec "$cmd" /dev/null >/dev/null 2>&1; then
+            unset upw
+            ok=1
+            break
+        fi
+        unset upw
+        (( attempt < 3 )) && dlg_note "Wrong passphrase for that key. Once more.\n(attempt ${attempt} of 3)"
+    done
+    (( ok == 1 )) || { rm -rf "$wdir"; lockd_slam; exit 1; }
     # the unlocked file must contain a real secret key - catches corrupt
     # or wrong-file identities instead of failing later, mid-flow
     grep -q "AGE-SECRET-KEY-" "$tmpid" \
         || { shred -uzn1 "$tmpid" 2>/dev/null; rm -rf "$wdir"; die "identity file is not a valid age key"; }
     printf '%s' "$tmpid"
+}
+
+desktop_dir() {  # the DE's real Desktop (localized), else ~/Desktop. rc 1 = none
+    local f="$HOME/.config/user-dirs.dirs" d=""
+    if [[ -r "$f" ]]; then
+        d=$(source "$f" 2>/dev/null; printf '%s' "${XDG_DESKTOP_DIR:-}")
+    fi
+    [[ -n "$d" && -d "$d" ]] && { printf '%s\n' "$d"; return 0; }
+    [[ -d "$HOME/Desktop" ]] && { printf '%s\n' "$HOME/Desktop"; return 0; }
+    return 1
+}
+
+backup_key_to_desktop() {  # $1 = identity file -> tarball path on stdout
+    # One-time safeguard at key birth: the wrapped identity lands on the
+    # Desktop as a dated tarball. Ciphertext is shareable by design (the
+    # passphrase is the secret), but 600 costs nothing. Human lines go to
+    # STDERR so command substitution only ever captures the path.
+    local id="$1" d out n=1
+    d=$(desktop_dir) \
+        || { printf '%s\n' "no Desktop dir found - safeguard the key file itself: $id" >&2; return 1; }
+    out="$d/lockd-key-$(date +%F).tar.gz"
+    while [[ -e "$out" ]]; do          # never overwrite an earlier backup
+        n=$((n + 1)); out="$d/lockd-key-$(date +%F)-$n.tar.gz"
+    done
+    if tar -czf "$out" -C "$(dirname "$id")" "$(basename "$id")" 2>/dev/null; then
+        chmod 600 "$out" 2>/dev/null || true
+        printf '%s\n' "$out"
+        return 0
+    fi
+    rm -f "$out" 2>/dev/null || true
+    printf '%s\n' "key backup to $d failed - safeguard the key file itself: $id" >&2
+    return 1
 }
 
 STANDARD_KEY_SPOTS=(
@@ -283,12 +375,11 @@ ensure_key() {
     dlg_q "No default AGE key found.\n(gpg keys are a different system - they do not apply here.)\n\nCreate one now? It becomes your lockd default.\nLives at: ${IDENTITY}" \
         || die "no key, no lock"
     local out
-    out=$(dlg_form) || die "cancelled"
+    out=$(dlg_creds) || exit 1  # dlg_creds already had the last word
     local f npw cpw chk
     mapfile -t f <<<"$out"
     npw="${f[0]:-}"; cpw="${f[1]:-}"; chk="${f[2]:-FALSE}"
     [[ -n "$npw" ]] || die "empty passphrase"
-    [[ "$npw" == "$cpw" ]] || die "passphrases do not match"
     if [[ "$chk" == TRUE ]]; then config_set fast_path 1; fi
     mkdir -p "$CONFIG_DIR"
     local id; id=$(identity_path)
@@ -302,7 +393,8 @@ ensure_key() {
     local cmd
     cmd=$(printf 'age -p -o %q %q' "$id" "$plain")
     printf '%s\n%s\n' "$npw" "$npw" | script -qfec "$cmd" /dev/null >/dev/null 2>&1 \
-        || { rm -rf "$wdir"; die "key encryption failed"; }
+        || { rm -rf "$wdir"; unset npw cpw; die "key encryption failed"; }
+    unset cpw     # confirm's work is done
     shred -uzn1 "$plain"
     [[ -f "$id" ]] || { rm -rf "$wdir"; die "key creation produced nothing"; }
     chmod 600 "$id"; chmod 700 "$CONFIG_DIR" 2>/dev/null || true
@@ -311,9 +403,22 @@ ensure_key() {
     cmd=$(printf 'age -d -o %q %q' "$check" "$id")
     printf '%s\n%s\n' "$npw" "$npw" | script -qfec "$cmd" /dev/null >/dev/null 2>&1 \
         && grep -q "AGE-SECRET-KEY-" "$check" \
-        || { rm -rf "$wdir"; shred -uzn1 "$id" 2>/dev/null; die "created key failed verification - nothing saved, run lockd again"; }
+        || { rm -rf "$wdir"; shred -uzn1 "$id" 2>/dev/null; unset npw; die "created key failed verification - nothing saved, run lockd again"; }
+    unset npw    # the passphrase did its job; it leaves immediately
     rm -rf "$wdir"
     say "key created + verified: $id"
+    # the one-time safeguard: a backup lands on the Desktop the moment the
+    # key exists, and the user is told exactly once to protect it. These
+    # users know they are wearing purple - no reminders, ever, after this.
+    local bk
+    if bk=$(backup_key_to_desktop "$id"); then
+        say "backup: $bk - safeguard it (and the passphrase) now."
+        ( sleep 6
+          [[ -n "${DISPLAY:-}" ]] && command -v notify-send >/dev/null \
+              && notify-send --hint=int:transient:1 -t 10000 "lockd" \
+                 "key created. backup: $bk - safeguard it (and the passphrase) now."
+        ) 2>/dev/null &
+    fi
     NEW_KEY=1
 }
 
@@ -322,12 +427,21 @@ usage() {
 lockd — lazy, kind encryption (age underneath)
 
   lockd [paths...]          encrypt files (or a directory: one archive)
-  lockd --shred paths...    secure-wipe any file (no encryption involved)
+  lockd --shred paths...    secure-wipe any file or directory tree.
+                            no questions asked - it goes, and lockd
+                            reports: "and just like that...gone"
   lockd -d paths...         decrypt .age files (originals of THIS run are
                             .age files; shredding them is offered, not forced)
                             directory archives restore the tree in place -
                             streamed, never overwriting, no archive residue
   lockd -k|--keep           encrypt but never wipe the originals
+  lockd -P|--pass paths...  one-off lock: lockd picks the passphrase
+                            (age-grade words, no user password - the
+                            forget-trap stays closed) and files it in
+                            the receipt book. Anyone holding the words
+                            opens it with any age implementation.
+  lockd -d (on a one-off)   the receipt book answers when it can
+  lockd --inspect paths...  peek: what could open this file? no decrypt
   lockd -f|--fast           this run: no send/extra offers
   lockd --full              this run: offers even if fast-path is saved
   lockd --selftest          crypto roundtrip + backend/clipboard checks, headless
@@ -474,7 +588,53 @@ STUB
     [[ "$res" -eq 0 ]] \
         || { echo "FAIL: residue left behind: $(ls -A "$t/isotmp" | tr '\n' ' ')"; return 1; }
 
-    echo "selftest: PASS (file + directory roundtrips, wipe semantics, backend walk, clipboard chain, ctx scripts, real-flow decrypt + zero residue)"
+    # --- the Desktop backup + the restore story: backup -> destroy ->
+    # restore -> decrypt, THEN restore with hostile metadata (1999 mtime,
+    # 777 perms) -> still decrypts. age reads bytes; timestamps and
+    # permissions play no part in decryption. Machine-checked forever so
+    # the "cp it back into a fresh install" promise can never silently rot.
+    mkdir -p "$t/home/.config/lockd" "$t/home/Desktop"
+    local wrapcmd; wrapcmd=$(printf 'age -p -o %q %q' \
+        "$t/home/.config/lockd/identity.txt" "$t/testkey.txt")
+    printf 'selftestpw\nselftestpw\n' | script -qfec "$wrapcmd" /dev/null >/dev/null 2>&1 \
+        || { echo "FAIL: could not build wrapped identity for backup test"; return 1; }
+    local bk
+    bk=$(HOME="$t/home" backup_key_to_desktop "$t/home/.config/lockd/identity.txt") \
+        || { echo "FAIL: Desktop backup skipped"; return 1; }
+    [[ -f "$bk" && -s "$bk" ]] \
+        || { echo "FAIL: backup tarball missing or empty"; return 1; }
+    rm -f "$t/home/.config/lockd/identity.txt"
+    mkdir -p "$t/restore"
+    tar -xzf "$bk" -C "$t/restore" || { echo "FAIL: backup tarball unreadable"; return 1; }
+    local rt1cmd; rt1cmd=$(printf 'age -d -i %q -o %q %q' "$t/restore/identity.txt" "$t/rt1.txt" "$t/plain.txt.age")
+    printf 'selftestpw\n' | script -qfec "$rt1cmd" /dev/null >/dev/null 2>&1
+    cmp -s "$t/roundtrip.txt" "$t/rt1.txt" \
+        || { echo "FAIL: restored key did not decrypt the payload"; return 1; }
+    # hostile metadata: the copy-back with every filemarker wrong
+    touch -d "1999-01-01 00:00:00" "$t/restore/identity.txt"
+    chmod 777 "$t/restore/identity.txt"
+    cp -f "$t/restore/identity.txt" "$t/home/.config/lockd/identity.txt"
+    local rt2cmd; rt2cmd=$(printf 'age -d -i %q -o %q %q' "$t/home/.config/lockd/identity.txt" "$t/rt2.txt" "$t/plain.txt.age")
+    printf 'selftestpw\n' | script -qfec "$rt2cmd" /dev/null >/dev/null 2>&1
+    cmp -s "$t/roundtrip.txt" "$t/rt2.txt" \
+        || { echo "FAIL: hostile-metadata copy-back did not decrypt"; return 1; }
+
+    # --pass one-off: autogen passphrase, receipt filing, verify-then-
+    # wipe, then a receipt-fed decrypt with ZERO questions
+    printf 'one-off payload %s\n' "$(date)" > "$t/oo.txt"
+    env HOME="$t" LOCKD_DIALOG=tty "$0" --pass "$t/oo.txt" >/dev/null 2>&1 \
+        || { echo "FAIL: --pass roundtrip"; return 1; }
+    [[ -s "$t/oo.txt.age" && ! -e "$t/oo.txt" ]] \
+        || { echo "FAIL: --pass wipe semantics"; return 1; }
+    [[ -s "$t/.config/lockd/oneoffs" ]] \
+        || { echo "FAIL: receipt book missing"; return 1; }
+    env HOME="$t" LOCKD_DIALOG=tty "$0" -d "$t/oo.txt.age" </dev/null >/dev/null 2>&1 \
+        || { echo "FAIL: receipt-fed decrypt"; return 1; }
+    grep -q "one-off payload" "$t/oo.txt" \
+        || { echo "FAIL: one-off roundtrip content"; return 1; }
+    env HOME="$t" "$0" --inspect "$t/oo.txt.age" </dev/null 2>/dev/null | grep -q "ONE-OFF passphrase" \
+        || { echo "FAIL: inspect (one-off detection)"; return 1; }
+    echo "selftest: PASS (file + directory roundtrips, wipe semantics, backend walk, clipboard chain, ctx scripts, real-flow decrypt + zero residue, backup-restore incl. hostile metadata, one-offs + receipt book + inspect)"
 }
 
 pick_files() {  # -> paths on stdout (empty on cancel)
@@ -678,35 +838,306 @@ do_encrypt() {
 
 do_shred() {
     # the wipe rule's machinery, standing alone: secure-wipe any file
+    # or directory tree (files inside shredded, tree removed).
+    # no confirmation, no victory lap: shred is a monster, and issuing it
+    # IS the confirmation. it speaks once, after the fact:
+    # "and just like that...gone".
+    # (2026-09-06: the yad confirm + per-file pop-ups went away - two
+    # dialogs in the face of a user who already decided was one too many)
     local paths=("$@")
     if (( ${#paths[@]} == 0 )); then
         mapfile -t paths < <(dlg_pick "lockd — pick file(s) to wipe")
         (( ${#paths[@]} > 0 )) || die "nothing picked"
     fi
-    dlg_q "Securely wipe ${#paths[@]} item(s)?\nThis cannot be undone." || die "cancelled"
-    local p
+    local p n=0
     for p in "${paths[@]}"; do
-        if [[ -f "$p" ]]; then
-            shred -uzn1 "$p" && notify "wiped: $(basename "$p")" && say "wiped: $p"
+        if [[ -d "$p" && ! -L "$p" ]]; then
+            # directory: the same recursive wipe the verified encrypt
+            # flow uses - shred every regular file inside, then remove
+            # the tree. no lockd flag involved; erase means erase.
+            # the tree can be big and shred flushes EVERY file to disk
+            # (that is the point of shred) - say what is happening up
+            # front and per file, so silence never looks like a hang.
+            local f nf=0
+            say "shred: $p - wiping every file inside (one sync per file: this takes a moment on big trees)..."
+            while IFS= read -r -d '' f; do
+                shred -uzn1 "$f" 2>/dev/null \
+                    && { say "gone: $f"; nf=$((nf+1)); } \
+                    || printf 'lockd: survived: %s (shred failed)\n' "$f" >&2
+            done < <(find "$p" -type f -print0)
+            rm -rf -- "$p" \
+                && { say "gone: $p (directory): ${nf} file(s) wiped"; n=$((n+1)); } \
+                || printf 'lockd: survived: %s (tree removal failed)\n' "$p" >&2
+        elif [[ -f "$p" ]]; then
+            shred -uzn1 "$p" && { say "gone: $p"; n=$((n+1)); } \
+                || printf 'lockd: survived: %s (shred failed)\n' "$p" >&2
         else
-            say "skip: $p (not a regular file)"
+            say "skip: $p (not a regular file or directory)"
+        fi
+    done
+    (( n > 0 )) && notify -t 3000 "and just like that...gone"
+    return 0
+}
+
+do_inspect() {  # --inspect: metadata without decrypting - which age(s)
+    # can open it. A native peek first (works on Debian's age 1.2.1);
+    # age-inspect(1) (age >= 1.3, when Debian ships it) gets the stage.
+    local paths=("$@")
+    local p ver stanzas nrec
+    for p in "${paths[@]}"; do
+        if [[ ! -f "$p" ]]; then say "skip: $p (missing)"; continue; fi
+        if command -v age-inspect >/dev/null 2>&1; then
+            say "== $p"
+            age-inspect "$p" 2>/dev/null || say "  inspect had nothing to say"
+            continue
+        fi
+        if ! head -c 64 "$p" | grep -aq "age-encryption.org/v"; then
+            say "not an age file: $p"; continue
+        fi
+        say "== $p"
+        ver=$(head -c 64 "$p" | grep -ao "age-encryption.org/v1")
+        say "  format: ${ver:-age (unknown version)}"
+        stanzas=$(head -c 16384 "$p" | grep -aoE '^-> [a-zA-Z0-9_-]+' | cut -d' ' -f2 | sort -u | tr '\n' ' ')
+        if [[ "$stanzas" == *scrypt* ]]; then
+            say "  locked with: a ONE-OFF passphrase (no key involved)"
+            say "  receipt book may know the words: $ONOFFS"
+        else
+            nrec=$(head -c 16384 "$p" | grep -ac '^-> X25519' || true)
+            say "  locked to a keypair: ${nrec:-1} recipient(s)"
+            [[ "$stanzas" == *mlkem768* ]] && say "  includes a post-quantum recipient (needs age >= 1.3)"
         fi
     done
 }
 
+is_scrypt() {  # $1 = .age file -> rc 0 if passphrase-locked (scrypt stanza)
+    head -c 512 "$1" 2>/dev/null | grep -aq scrypt
+}
+
+parse_generated_pw() {  # $1 = script capture file -> autogenerated passphrase
+    grep -aoE 'using autogenerated passphrase "[^"]+"' "$1" 2>/dev/null \
+        | head -1 | sed -E 's/.*"([^"]+)".*/\1/'
+}
+
+receipt_pw_for() {  # $1 = .age one-off -> the receipt-book passphrase (or "")
+    # receipt matches on the ORIGINAL basename (files travel; the book
+    # remembers what was made where)
+    local want; want="$(basename "${1%.age}")"
+    want="${want%.tar.gz}"    # directory archives: the tree's own name is filed
+    [[ -f "$ONOFFS" ]] || return 0
+    awk -F'\t' -v want="$want" '{ n=$2; sub(/.*\//, "", n); if (n == want) print $3 }' "$ONOFFS" 2>/dev/null | tail -1
+}
+
+oneoff_pw_for() {  # $1 = the .age one-off -> passphrase on stdout.
+    # receipt book first (zero prompts when it knows), then 3 strikes of
+    # the passphrase form, slam after. rc 1 = gave up; slam already shown.
+    local attempt out f cand
+    local rp; rp=$(receipt_pw_for "$1")
+    for attempt in 1 2 3; do
+        if [[ $attempt -eq 1 && -n "$rp" ]]; then
+            cand="$rp"
+        else
+            out=$(dlg_creds) || return 1
+            mapfile -t f <<<"$out"
+            cand="${f[0]}"; unset f out
+        fi
+        if printf '%s\n' "$cand" | script -qfec "age -d $(printf %q "$1")" /dev/null >/dev/null 2>&1; then
+            printf '%s' "$cand"
+            return 0
+        fi
+        unset cand
+        if [[ $attempt -eq 1 && -n "$rp" ]]; then
+            dlg_note "The receipt book did not open this one.\nSay the remaining words - (attempt 2 of 3)." 2>/dev/null || true
+        else
+            (( attempt < 3 )) && dlg_note "Wrong passphrase. Once more.\n(attempt ${attempt} of 3)"
+        fi
+    done
+    lockd_slam || return 1
+}
+
+do_pass() {  # --pass: one-off locks. lockd picks the passphrase (age-grade
+    # words), the user never sums one up - that is the willy-nilly
+    # forget-trap, closed. The passphrase is shown once and filed in the
+    # receipt book (~/.config/lockd/oneoffs, 600). Anyone holding the
+    # words can open the file with ANY age implementation; nobody else
+    # ever could. Deleting the receipt line deletes future access,
+    # deliberately.
+    need age; need script
+    mkdir -p "$CONFIG_DIR"; chmod 700 "$CONFIG_DIR" 2>/dev/null || true
+    touch "$ONOFFS" 2>/dev/null || die "cannot create the receipt book: $ONOFFS"
+    chmod 600 "$ONOFFS" 2>/dev/null || true
+    local paths=("$@")
+    if (( ${#paths[@]} == 0 )); then
+        mapfile -t paths < <(pick_files)
+        (( ${#paths[@]} > 0 )) || die "nothing picked"
+    fi
+    trap 'cleanup_ids; [[ -n "${VFDIR:-}" ]] && rm -rf "${VFDIR}"; [[ -n "${STAGE:-}" ]] && rm -rf "${STAGE}"; VFDIR=""; STAGE=""' EXIT
+    local p out base cap pw vcmp vext stage ok=0 sz room n=0 made=() apath
+    for p in "${paths[@]}"; do
+        [[ -e "$p" ]] || { say "skip: $p (missing)"; continue; }
+        sz=$(du -sb "$p" 2>/dev/null | cut -f1); sz=${sz:-0}
+        if [[ -d "$p" ]]; then
+            out="$(dirname "$p")/$(basename "$p").tar.gz.age"
+        else
+            out="${p}.age"
+        fi
+        room=$(df -B1 --output=avail "$(dirname "$out")" 2>/dev/null | tail -1 | tr -d ' ')
+        if [[ -n "$room" && "$sz" -gt 0 ]] && (( room < sz * 3 + 104857600 )); then
+            dlg_err "Not enough free space beside the target to verify safely.\nNeed ~$(( sz * 3 / 1073741824 + 1 ))GB, have $(( room / 1073741824 ))GB on $(dirname "$out").\nNothing was encrypted."
+            continue
+        fi
+        stage=$(mktemp -d "$(dirname "$out")/.lockd-oo.XXXXXX")
+        chmod 700 "$stage"; STAGE="$stage"
+        ok=0; pw=""
+        local srcpath="$stage/ta"   # staged plaintext (tar for dirs, copy for files)
+        if [[ -d "$p" ]]; then
+            tar -C "$(dirname "$p")" -czf "$srcpath" "$(basename "$p")" 2>/dev/null \
+                || { rm -rf "$stage"; STAGE=""; dlg_err "staging failed for $p"; continue; }
+        else
+            cp -f -- "$p" "$srcpath" && chmod 700 "$stage"
+        fi
+        # lockd picks the words: empty passphrase -> age autogenerates
+        printf '\n\n' | script -qfec "age -p -o $(printf %q "$out") $(printf %q "$srcpath")" \
+            "$stage/cap" >/dev/null 2>&1
+        pw=$(parse_generated_pw "$stage/cap")
+        unset srcpath
+        if [[ -z "$pw" || ! -s "$out" ]]; then
+            rm -rf "$stage"; STAGE=""; dlg_err "one-off lock failed for $p"; continue
+        fi
+        shred -uzn1 "$stage/cap" 2>/dev/null || true   # capture has the words
+        unset srcpath
+        local vcmp="$stage/vcmp"
+        if printf '%s\n' "$pw" | script -qfec "age -d -o $(printf %q "$vcmp") $(printf %q "$out")" /dev/null >/dev/null 2>&1; then
+            if [[ -d "$p" ]]; then
+                vext="$stage/extract"; mkdir -p "$vext"
+                tar -xzf "$vcmp" -C "$vext" 2>/dev/null \
+                    && diff -r -q --no-dereference "$p" "$vext/$(basename "$p")" >/dev/null 2>&1 \
+                    && ok=1
+            else
+                cmp -s "$vcmp" "$p" && ok=1
+            fi
+        fi
+        if [[ $ok -eq 1 ]]; then
+            if [[ $KEEP -eq 1 ]]; then
+                say "verified: $out (original kept: --keep)"
+                notify "original kept (--keep): $(basename "$p")"
+            elif [[ -d "$p" ]]; then
+                local ff
+                while IFS= read -r -d '' ff; do shred -uzn1 "$ff" 2>/dev/null || true; done \
+                    < <(find "$p" -type f -print0)
+                rm -rf -- "$p" && say "verified + wiped: $p  ->  $out"
+            else
+                shred -uzn1 "$p" && say "verified + wiped: $p  ->  $out"
+            fi
+        else
+            shred -uzn1 "$out" 2>/dev/null || true
+            rm -rf "$stage"; STAGE=""
+            dlg_err "VERIFICATION FAILED for $p\nThe original was KEPT and the bad ciphertext was destroyed.\nNothing was lost. That is the rule."
+            say "VERIFICATION FAILED: $p kept, bad ciphertext destroyed"
+            continue
+        fi
+        rm -rf "$stage"; STAGE=""
+        apath=$(realpath -- "$p")
+        # one-time receipt: origin path, the words, 600. spoken once.
+        printf '%(%F %H:%M)T\t%s\t%s\n' -1 "$apath" "$pw" >> "$ONOFFS"
+        say "one-off locked: $out"
+        say "passphrase: $pw   (receipt: $ONOFFS)"
+        notify "one-off locked - passphrase: $pw"
+        made+=("$out")
+    done
+    (( ${#made[@]} > 0 )) || { say "nothing done"; return 0; }
+    if [[ $KEEP -eq 1 ]]; then
+        say "the receipt book is your only record: $ONOFFS"
+    fi
+    say "whoever has the words opens the file with any age implementation"
+    return 0
+}
+
+oneoff_restore_tree() {  # $1 = passphrase, $2 = the .tar.gz.age one-off.
+    # stage the decrypted archive to disk (binary NEVER rides the pty),
+    # extract, bring the tree home - never over an existing name.
+    local pw="$1" p="$2" asz room stage root target moved=0
+    asz=$(stat -c %s "$p" 2>/dev/null || echo 0)
+    room=$(df -B1 --output=avail "$(dirname "$p")" 2>/dev/null | tail -1 | tr -d ' ')
+    if [[ -n "$room" ]] && (( asz > 0 && room < asz * 3 + 104857600 )); then
+        dlg_err "Not enough free space beside $p to restore the tree.\nNeed ~$(( asz * 3 / 1073741824 + 1 ))GB, have $(( room / 1073741824 ))GB. Nothing was changed."
+        return 0
+    fi
+    stage=$(mktemp -d "$(dirname "$p")/.lockd-ex.XXXXXX")
+    chmod 700 "$stage"; mkdir -p "$stage/ex"; STAGE="$stage"
+    if ! printf '%s\n' "$pw" | script -qfec "age -d -o $(printf %q "$stage/ta") $(printf %q "$p")" /dev/null >/dev/null 2>&1 \
+        || [[ ! -s "$stage/ta" ]]; then
+        dlg_err "Restore failed - those words did not open it.\nThe .age source is untouched."
+        rm -rf "$stage"; STAGE=""; return 0
+    fi
+    if ! tar -xzf "$stage/ta" -C "$stage/ex" 2>/dev/null; then
+        dlg_err "Restore failed - extraction ran out of space.\nThe .age source is untouched."
+        shred -uzn1 "$stage/ta" 2>/dev/null || true
+        rm -rf "$stage"; STAGE=""; return 0
+    fi
+    while IFS= read -r -d '' root; do
+        [[ -n "$root" ]] || continue
+        target="$(dirname "$p")/$(basename "$root")"
+        if [[ -e "$target" ]]; then
+            say "conflict: $target already exists - restore kept at $(find "$stage/ex" -mindepth 1 -maxdepth 1)"
+            notify "restore conflict - nothing overwritten"
+            continue
+        fi
+        mv -- "$root" "$target" \
+            && { say "restored: $target"; RESTORED="$target"; moved=$((moved+1)); }
+    done < <(find "$stage/ex" -mindepth 1 -maxdepth 1 -print0)
+    shred -uzn1 "$stage/ta" 2>/dev/null || true
+    if [[ -z "$(ls -A "$stage" 2>/dev/null)" ]]; then
+        rm -rf "$stage"; STAGE=""
+    else
+        STAGE=""   # conflict: staging kept on purpose - nothing can be lost
+    fi
+    (( moved > 0 )) || say "decrypted: $p (one-off - see messages above)"
+}
+
 do_decrypt() {
     need age; need age-keygen
-    [[ -f "$(identity_path)" ]] || die "no default key to unlock"
-    TMPID=$(unlock_identity)
-    trap 'cleanup_ids; [[ -n "${VFDIR:-}" ]] && rm -rf "${VFDIR}"; [[ -n "${STAGE:-}" ]] && rm -rf "${STAGE}"; VFDIR=""; STAGE=""' EXIT
     local paths=("$@")
     if (( ${#paths[@]} == 0 )); then
         mapfile -t paths < <(dlg_pick "lockd — pick .age to decrypt" "age files | *.age")
         (( ${#paths[@]} > 0 )) || die "nothing picked"
     fi
-    local p out
+    local p out any_keyed=0
+    for p in "${paths[@]}"; do
+        if [[ -f "$p" ]] && ! is_scrypt "$p"; then any_keyed=1; fi
+    done
+    if (( any_keyed == 1 )); then
+        [[ -f "$(identity_path)" ]] || die "no default key to unlock"
+        TMPID=$(unlock_identity)
+    fi
+    trap 'cleanup_ids; [[ -n "${VFDIR:-}" ]] && rm -rf "${VFDIR}"; [[ -n "${STAGE:-}" ]] && rm -rf "${STAGE}"; VFDIR=""; STAGE=""' EXIT
     for p in "${paths[@]}"; do
         [[ -f "$p" ]] || { say "skip: $p (missing)"; continue; }
+        if is_scrypt "$p"; then
+            # one-off: the receipt book answers when it can, the user
+            # otherwise. passphrase NEVER travels through a pipe - only
+            # into the pty feed.
+            local pw
+            pw=$(oneoff_pw_for "$p") \
+                || { say "one-off: three strikes - nothing was opened"; RESTORED=""; continue; }
+            if [[ "$p" == *.tar.gz.age ]]; then
+                oneoff_restore_tree "$pw" "$p"
+                continue
+            fi
+            local outo
+            case "$p" in
+                *.age) outo="${p%.age}" ;;
+                *)     outo="${p}.decrypted" ;;
+            esac
+            if printf '%s\n' "$pw" | script -qfec "age -d -o $(printf %q "$outo") $(printf %q "$p")" /dev/null >/dev/null 2>&1; then
+                RESTORED="$outo"
+                say "decrypted: $p  ->  $outo"
+            else
+                dlg_err "one-off: the words did not open $p\n(the receipt book is at $ONOFFS)"
+                say "one-off unlock failed: $p"
+            fi
+            unset pw
+            continue
+        fi
         if [[ "$p" == *.tar.gz.age ]]; then
             # directory archive: stream-decrypt straight into extraction -
             # the plaintext archive never exists as a file, the tree comes
@@ -775,6 +1206,8 @@ main() {
             -f|--fast)   FAST_RUN=1 ;;
             --full)      FULL_RUN=1 ;;
             -d|--decrypt) DECRYPT=1 ;;
+            -P|--pass)    PASS_MODE=1 ;;
+            --inspect)    INSPECT=1 ;;
             --open)       OPEN=1 ;;
             --shred)     SHRED_MODE=1 ;;
             --selftest)  do_selftest; exit $? ;;
@@ -799,6 +1232,8 @@ main() {
     local idnow; idnow=$(identity_path)
     [[ -f "$idnow" ]] && chmod 600 "$idnow" 2>/dev/null || true
     if [[ $SHRED_MODE -eq 1 ]]; then do_shred "${args[@]}";
+    elif [[ $PASS_MODE -eq 1 ]]; then do_pass "${args[@]}";
+    elif [[ $INSPECT -eq 1 ]]; then do_inspect "${args[@]}";
     elif [[ $DECRYPT -eq 1 ]]; then do_decrypt "${args[@]}"; else do_encrypt "${args[@]}"; fi
 }
 
