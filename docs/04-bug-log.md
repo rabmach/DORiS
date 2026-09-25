@@ -441,3 +441,50 @@ are not root, trust `whoami` — you ARE the target user, always.
 shell. A login shell it drops you into is a fresh user with that note
 still in their pocket. Never read the note unless you are the root it
 was written for.
+
+### BUG-016 — selftest false-positive on vendored lockd + --quiet hid the reason (2026-09-25, fresh restore off v1.3-era master)
+
+**Found by:** machiner, first restore after the reinstall. Cloned the kit,
+self-test hard-failed, restore refused, fell back to v1.2. With no detail
+on screen — the report was "hard stop, fix the error"; the actual [HARD]
+line naming the file never showed.
+
+**Mechanism (two bugs stacked):**
+
+1. The tokenizer check greps every `/home/<name>` in the kit and calls it
+   a baked login home. Vendoring lockd 1.3 shipped lockd's OWN selftest,
+   which builds a throwaway tree at `$t/home/Desktop` (that is lockd's
+   key-backup destiny check: variable-anchored by construction). Grep
+   can't see the `$t` — it only sees `/home/Desktop`, calls it a login
+   home, and the restore gate dies on a path that is dynamic by
+   definition. The check could not tell a test tree from a real home.
+2. `tasks/system/00-check.sh` runs the selftest with `--quiet`, which at
+   the time silenced the ok-lines AND the [HARD]/[WARN] lines. The one
+   line that explained everything was pre-filtered. Verdict without
+   evidence.
+
+**Fix (tools/selftest.sh):** `$var/home/...` is extracted as its own form
+(the regex alternation keeps it one token) and skipped — anchored to a
+runtime variable IS tokenization, the exact property the check defends.
+Plain `/home/name` flags exactly as before. And [HARD]/[WARN] lines print
+in every mode now: silence is fine when there is nothing to say, and a
+lie when there is.
+
+**Fix (tasks/system/00-check.sh):** the die message points at the failing
+check above it instead of gesturing vaguely.
+
+**Proof:** fixture kit with a planted `/home/bob` still hard-fails (and
+the line survives `--quiet`); the real kit self-tests 0/0; vendored
+lockd's own selftest passes (rc=0, zero residue), so task 13's wiring
+gate holds on fresh restores.
+
+**Also settled while here:** the v1.3 TAG is green — the failure came
+from the vendor commit after the tag, and `git clone` hands you master,
+not a tag. The vendored bin/lockd is byte-identical to upstream lockd
+main (cmp), so the fix went into the CHECK, never into a vendor copy
+(vendored copies stay upstream-pure; editing them starts drift).
+
+**Lesson:** a validator must be able to tell `$t/home` from `/home/bob`
+before it stops a restore on the difference. Same family as BUG-002:
+a typo in the safety harness shoots the patient.
+

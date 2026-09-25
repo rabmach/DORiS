@@ -4,7 +4,7 @@
 ### selftest.sh - validate the DORiS kit before you trust a restore to it.
 ###
 ###   ./tools/selftest.sh           # full output
-###   ./tools/selftest.sh --quiet   # minimal output (exit code only)
+###   ./tools/selftest.sh --quiet   # ok-lines silenced; [HARD]/[WARN] still print
 ###
 ### Exit codes:
 ###   0  kit is sound
@@ -14,6 +14,7 @@
 ### Checks (hard unless noted):
 ###   * every shell script in the kit parses (bash -n)
 ###   * no hardcoded login-home paths (/home/<name>) - kit must be tokenized
+###     ($var/home is allowed: anchored to a runtime variable, not baked)
 ###   * no ~/.local/share/icons|themes references in config/ (system-wide now)
 ###   * every icon referenced by menu.xml exists under local/share/icons
 ###   * the GTK theme/icon names in settings resolve under local/share
@@ -29,8 +30,10 @@ QUIET=false
 HARD=0
 WARN=0
 say() { $QUIET || echo "$*"; }
-hard() { say "  [HARD] $*"; HARD=$((HARD + 1)); }
-soft() { say "  [WARN] $*"; WARN=$((WARN + 1)); }
+# A gate that hides its reason is a locked door with no note: [HARD]/[WARN]
+# print even in --quiet. "fix the error" without the error is not a message.
+hard() { echo "  [HARD] $*"; HARD=$((HARD + 1)); }
+soft() { echo "  [WARN] $*"; WARN=$((WARN + 1)); }
 
 say "== DORiS kit self-test =="
 
@@ -75,11 +78,15 @@ while IFS= read -r -d '' f; do
     if grep -qE '/home/[A-Za-z0-9_]+[^$]' "$f" 2>/dev/null \
        && ! grep -q '/home/\$USER' "$f" 2>/dev/null; then
         # tokenized files legitimately contain /home/$USER; flag only real names
+        # $var/home/... is anchored to a runtime variable, dynamic by definition
+        # (vendored lockd's own selftest builds a throwaway tree at $t/home/
+        # Desktop) - extract that form separately so it can be skipped
         while IFS= read -r hit; do
+            [[ "$hit" == "\$"* ]] && continue   # $var/home/... - dynamic, fine
             [[ "$hit" == *"/home/\$USER"* ]] && continue
             case "$hit" in *'/home/'*'$'*) continue ;; esac   # $VAR style
             hard "hardcoded home path in $f: $hit"
-        done < <(grep -oE '/home/[A-Za-z0-9_]+' "$f" 2>/dev/null | sort -u)
+        done < <(grep -oE '\$[A-Za-z_][A-Za-z0-9_]*/home/[A-Za-z0-9_]+|/home/[A-Za-z0-9_]+' "$f" 2>/dev/null | sort -u)
     fi
 done < <(find config home bin -type f -print0 2>/dev/null)
 

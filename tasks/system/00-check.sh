@@ -60,7 +60,7 @@ if [[ -x "$DORIS_DIR/tools/selftest.sh" ]]; then
         if [[ $rc -eq 2 ]]; then
             warn "Self-test reported warnings only - continuing."
         else
-            die "Kit self-test FAILED (exit $rc). Fix the kit before restoring."
+            die "Kit self-test FAILED (exit $rc) - the failing check is printed above. Fix the kit before restoring."
         fi
     fi
 else
