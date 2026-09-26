@@ -3,7 +3,7 @@
  <menu id="root-menu" label="Openbox 3">
 <!--obamenu for the application goodness -->
 
-<menu id="apps-menu" label="Apps" icon="/usr/share/icons/kora/apps/scalable/0ad.svg" execute="~/bin/obamenu.py" />
+<menu id="apps-menu" label="Apps" icon="/usr/share/icons/gnome/16x16/places/novell-button.png" execute="~/bin/obamenu.py" />
 
 
          <!--end obamenu for the application goodness -->
@@ -38,8 +38,8 @@
 		</action>
 		</item>
 </menu>
-<!--
-<menu id="pianobar" label="Pianobar" icon="/usr/share/icons/kora/apps/scalable/screenie.svg">
+
+<menu id="pianobar" label="Pianobar" icon="/usr/share/icons/kora/panel/16/banshee-panel.svg">
   <item label="Play" icon="/usr/share/icons/kora/actions/16/media-play.svg">
       <action name="Execute">
 <command>~/.config/pianobar/control-pianobar.sh p</command>
@@ -81,13 +81,13 @@
       </action>
    </item>
    </menu>
--->
+
 <!-- end scrot menu -->
 <!-- scripts-->
 <!--
  <menu icon="/usr/share/icons/kora/apps/scalable/7596_iexplore.0.svg"  execute="~/bin/procinfo.pl" id="proc-menu" label="Processes"/>
 -->
-   <menu icon="/usr/share/icons/kora/apps/scalable/7765_winebrowser.0.svg"  execute="~/bin/datemenu.py" id="date-menu" label="Forward"/>
+   <menu icon="/usr/share/icons/kora/places/symbolic/document-open-recent.svg"  execute="~/bin/datemenu.py" id="date-menu" label="Forward"/>
    <!--
   <menu icon="/usr/share/icons/kora/status/scalable/face-cool.svg"  execute="~/bin/recent.sh" id="recent" label="Recent"/> 
 -->
@@ -99,11 +99,11 @@
 <menu id="weather" label="Weather" icon="/usr/share/icons/kora/apps/scalable/com.github.bitseater.weather.svg" execute="~/bin/weather.sh -o" />
 <!-- end weather pipemenu -->
 
-<menu icon="/usr/share/icons/kora/apps/scalable/7765_winebrowser.0.svg"   execute="~/.config/openbox/show_ob_keybindings.py" id="showkeys" label="Keybindings"/>
+<menu icon="/usr/share/icons/kora/emblems/scalable/emblem-dropbox-app.svg"   execute="~/.config/openbox/show_ob_keybindings.py" id="showkeys" label="Keybindings"/>
 <seperator/>
 
         <!-- character menu -->
-<menu id="character map" label="Characters" icon="/usr/share/icons/kora/apps/scalable/1password.svg">
+<menu id="character map" label="Characters" icon="/usr/share/icons/kora/emblems/symbolic/emblem-default-symbolic.svg">
     <item label="&#224;">
        <action name="Execute">
           <execute>
@@ -346,7 +346,7 @@
       </item>
    -->
  <!-- logout -->
-	<item label="adios" icon="/usr/share/icons/kora/apps/scalable/zenmap.svg">
+	<item label="adios" icon="/usr/share/icons/kora/panel/16/btsync-gui-9.svg">
 		<action name="Execute">
 			<command>obsession-logout -p "Beat Feet, Man" -b ~/Pictures/truckin-bnl67.jpg</command>
 		</action>
