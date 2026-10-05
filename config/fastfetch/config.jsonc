@@ -1,103 +1,81 @@
 {
     "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
-   "logo": {
-    "padding": {
-      "top": 2,
-      "left": 1,
-      "right": 2
-    }
-  },
-    "display":
-    {
-        "separator": " -> "
+    "logo": {
+        "type": "small",
+        "padding": {
+            "top": 1,
+            "right": 2
+        }
     },
+
     "modules": [
-        "datetime",
-        "initsystem",
-        "loadavg",
-        "processes",
-        "memory",
-        "theme",
         {
-            "type": "host",
-            "key": "󰌢 PC",
-            "keyColor": "green"
+            "format": "{#keys}\u001b[76D           💻         : {user-name-colored}{at-symbol-colored}{host-name-colored}",
+            "type": "title"
         },
         {
-            "type": "os",
-            "key": " OS",
-            "keyColor": "yellow",
-            "format": "{2}"
+            "key": "{#31} kernel   ",
+            "type": "kernel"
         },
         {
-            "type": "kernel",
-            "key": "├",
-            "keyColor": "yellow"
+            "key": "{#32}󰅐 uptime   ",
+            "type": "uptime"
         },
         {
-            "type": "uptime",
-            "key": "└󰅐",
-            "keyColor": "green"
+            "key": "{#33}{icon} distro   ",
+            "type": "os"
         },
         {
-            "type": "packages",
-            "key": "├󰏖",
-            "keyColor": "yellow"
+            "key": "{#34}󰇄 desktop  ",
+            "type": "de"
         },
         {
-            "type": "wm",
-            "key": " DE/WM",
-            "keyColor": "blue"
+            "key": "{#35} term     ",
+            "type": "terminal"
         },
         {
-            "type": "wmtheme",
-            "key": "├󰉼",
-            "keyColor": "blue"
+            "key": "{#36} shell    ",
+            "type": "shell"
         },
         {
-            "type": "icons",
-            "key": "├󰀻",
-            "keyColor": "blue"
-        },
-        {
-            "type": "terminal",
-            "key": "├",
-            "keyColor": "blue"
-        },
-        {
-            "type": "shell",
-            "key": "└",
-            "keyColor": "yellow"
-        },
-        {
+            "key": "{#35}󰍛 cpu      ",
             "type": "cpu",
-            "key": "├󰻠",
-            "keyColor": "green"
+            "showPeCoreCount": true,
+            "temp": true
         },
         {
-            "type": "gpu",
-            "key": "├󰍛",
-            "keyColor": "red"
+            "key": "{#34}󰍛 gpu      ",
+            "type": "gpu"
         },
         {
+            "key": "{#33}󰉉 disk     ",
             "type": "disk",
-            "key": "├",
-            "keyColor": "green"
+            "folders": "/"
         },
         {
+            "key": "{#32} memory   ",
+            "type": "memory"
+        },
+        {
+            "key": "{#31}󰩟 network  ",
+            "type": "localip",
+            "format": "{ipv4} ({ifname})"
+        },
+           {
+             "key": "{#33} Sound    ",
             "type": "sound",
-            "key": " SOUND",
-            "keyColor": "cyan"
-        },
+         },
         {
+             "key": "{#33}󰥠          ",
             "type": "player",
-            "key": "├󰥠",
-            "keyColor": "cyan"
+           
+            
         },
         {
+             "key": "{#31}󰝚          ",
             "type": "media",
-            "key": "└󰝚",
-            "keyColor": "cyan"
-        },
+           
+        }
+
     ]
 }

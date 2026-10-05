@@ -356,7 +356,10 @@
           <enabled>true</enabled>
           <name>wicn</name>
         </startupnotify>
-        <command>audacious --enqueue https://wicn-ice.streamguys1.com/live-mp3</command>
+        <command>audacious</command>
+        <!--
+        <command>audacious [double-dash]enqueue https://wicn-ice.streamguys1.com/live-mp3</command>
+      -->
       </action>
     </keybind>
     <!--
@@ -366,30 +369,31 @@
           <enabled>true</enabled>
           <name>Browsah</name>
         </startupnotify>
-        <command>x-www-browser</command>
-      </action>
-    </keybind>
-  -->
-    <!--  
-  <keybind key="W-b">
-      <action name="Execute">
-        <startupnotify>
-          <enabled>true</enabled>
-          <name>Browsah</name>
-        </startupnotify>
         <command>firefox -no-remote</command>
       </action>
     </keybind>
--->
+  -->
     <keybind key="W-b">
       <action name="Execute">
         <startupnotify>
           <enabled>true</enabled>
           <name>Browsah</name>
         </startupnotify>
-        <command>helium --password-store=basic</command>
+        <command>/usr/bin/helium --disk-cache-dir=/mnt/ramdisk</command>
       </action>
     </keybind>
+    <!--
+    <keybind key="W-b">
+      <action name="Execute">
+        <startupnotify>
+          <enabled>true</enabled>
+          <name>Browsah</name>
+        </startupnotify>
+        <command>helium [double-dash]password-store=basic</command>
+        [double-dash]disable-features=OptimizationGuideModelDownloads,OptimizationHints "$@"
+      </action>
+    </keybind>
+  -->
     <keybind key="W-c">
       <action name="Execute">
         <name>spoken greeting</name>
@@ -445,10 +449,18 @@
         <command>claws-mail</command>
       </action>
     </keybind>
+    <!--
     <keybind key="W-n">
       <action name="Execute">
         <name>play music</name>
         <command>tunes</command>
+      </action>
+    </keybind>
+  -->
+    <keybind key="W-n">
+      <action name="Execute">
+        <name>play music</name>
+        <command>x-terminal-emulator -e ~/bin/cliamp https://wicn-ice.streamguys1.com/live-mp3</command>
       </action>
     </keybind>
     <keybind key="W-o">
@@ -470,19 +482,21 @@
         <command>~/.config/pianobar/control-pianobar.sh p</command>
       </action>
     </keybind>
+    <!--
     <keybind key="W-q">
       <action name="Execute">
         <name>audio record</name>
         <command>rec</command>
       </action>
     </keybind>
+    -->
     <keybind key="W-r">
       <action name="Execute">
         <name>screen recorder, recording</name>
         <command>simplescreenrecorder --start-recording --start-hidden</command>
       </action>
     </keybind>
-        <keybind key="W-s">
+    <keybind key="W-s">
       <action name="Execute">
         <name>screencapture</name>
         <command>scrad</command>
@@ -506,7 +520,7 @@
         <command>x-terminal-emulator -e /home/$USER/bin/batt -w</command>
       </action>
     </keybind>
-        <keybind key="W-w">
+    <keybind key="W-w">
       <action name="Execute">
         <name>Writer</name>
         <command>/usr/bin/lowriter</command>
@@ -669,6 +683,24 @@
       </action>
     </keybind>
     <!-- end keyboard audio mappings -->
+    <keybind key="C-A-e">
+      <action name="Execute">
+        <execute>/home/$USER/bin/lockd</execute>
+      </action>
+    </keybind>
+    <!-- P53s: HDMI-2 brightness (added by apply-p53s.sh) -->
+    <keybind key="W-F5">
+      <action name="Execute">
+        <name>dim screen</name>
+        <command>/usr/local/bin/dim</command>
+      </action>
+    </keybind>
+    <keybind key="W-F6">
+      <action name="Execute">
+        <name>bright screen</name>
+        <command>/usr/local/bin/bright</command>
+      </action>
+    </keybind>
   </keyboard>
   <mouse>
     <dragThreshold>1</dragThreshold>

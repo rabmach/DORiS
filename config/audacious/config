@@ -9,8 +9,8 @@ record_stream=0
 [audgui]
 clear_song_fields=FALSE
 eq_preset_win=712,252,332,228
+info_win=539,161,677,421
 no_confirm_playlist_delete=TRUE
-info_win=539,161,677,409
 
 [filewriter]
 file_path=file:///home/$USER/Pictures/audrips
@@ -18,8 +18,8 @@ prependnumber=TRUE
 
 [gtkui]
 column_widths=10,275,175,10,175,175,10,100,45,10,275,275,275,10,275,175,75,10
-player_x=940
-player_y=166
+player_x=400
+player_y=164
 
 [gtkui-layout]
 item_count=0

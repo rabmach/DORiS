@@ -70,14 +70,21 @@
             "type": "localip",
             "format": "{ipv4} ({ifname})"
         },
+
         {
-            "format": "{#1}{#keys}├{$1}┤",
-            "type": "custom"
+            "type": "sound",
+            "key": " SOUND",
+            "keyColor": "cyan"
         },
         {
-            "key": "{$2}{#39} colors   ",
-            "type": "colors",
-            "symbol": "circle"
+            "type": "player",
+            "key": "├󰥠",
+            "keyColor": "cyan"
+        },
+        {
+            "type": "media",
+            "key": "└󰝚",
+            "keyColor": "cyan"
         },
         {
             "format": "{#1}{#keys}╰{$1}╯",

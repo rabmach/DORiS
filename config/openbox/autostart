@@ -1,4 +1,4 @@
-#[ -d ~/.screenlayout ] && "$(ls ~/.screenlayout/*.sh | head -1)"
+[ -d ~/.screenlayout ] && "$(ls ~/.screenlayout/*.sh | head -1)"
 waldesk &
 solaar &
 (sleep 1s && ~/bin/fastcompmgr -o 0.4 -r 12 -c -C) &
@@ -9,3 +9,6 @@ solaar &
 #pnmixer &
 #tint2 &
 
+
+# doris first-login welcome (shows once, then self-disables).
+(sleep 10s && exec $HOME/bin/doris-welcome) &
