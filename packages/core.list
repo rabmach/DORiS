@@ -11,6 +11,10 @@ polkitd
 pkexec
 xdotool
 
+# wmctrl - george (and other apps) use it for window chips,
+# self-maximize/undecorate; x11-xserver-utils holds xprop but not this
+wmctrl
+
 # --- networking (wifi config + tray) ---
 network-manager
 network-manager-applet
