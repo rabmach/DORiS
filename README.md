@@ -13,8 +13,8 @@ needs is `apt`.
 Menus, keys, firewall, welcome screen. It's a whole 'nother level, right in
 your pocket. Heh, or, at least I think so. I have been running the <a target="_blank" href="https://github.com/tycho-kirchner/fastcompmgr" title="fastcompmgr">fastcompmgr</a> compositor for some years and it's been great so it's included in DORiS run from ~/bin.
 
-![The doris desktop](docs/images/desktop.jpg)
-*The doris desktop — Openbox, keyboard-driven...colorful.*
+![The DORiS desktop](docs/images/desktop.jpg)
+*DORiS desktop — Openbox, keyboard-driven, tuned. Background image is "palaver". DOn't know if art or artist, though. It was posted to reddit a few years ago and I fell in love*
 
 ## Why DORiS
 
