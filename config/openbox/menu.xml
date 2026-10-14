@@ -81,6 +81,9 @@
       </action>
    </item>
    </menu>
+    <item label="Theme Flip" icon="/usr/share/icons/kora/panel/16/colorimeter-colorhug-symbolic.svg">
+        <command>~/bin/doris-theme</command>
+    </item>
 
 <!-- end scrot menu -->
 <!-- scripts-->

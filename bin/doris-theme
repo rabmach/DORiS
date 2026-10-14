@@ -1,0 +1,239 @@
+#!/bin/bash
+# doris-theme - flip the whole desk between Nord and Gruvbox in one motion.
+#
+# Eight surfaces, one flip:
+#   1. GTK3     ~/.config/gtk-3.0/settings.ini      gtk-theme-name
+#   2. GTK4     ~/.config/gtk-4.0/gtk{,-dark}.css   css variants live in ./variants
+#   3. openbox  ~/.config/openbox/rc.xml            <theme><name>
+#   4. geany    ~/.config/geany/geany.conf          color_scheme
+#   5. alacritty ~/.config/alacritty/alacritty.toml import line
+#   6. wallpaper ~/.config/wallpapers.cfg           image names swapped in place
+#   7. mc        ~/.config/mc/ini                   skin= (skins in ./skins)
+#   8. btop      ~/.config/btop/btop.conf           color_theme=
+#
+# The current theme is inferred from the config itself - no state file to go
+# stale. Every touched file gets a .bak-doris-theme backup the first time.
+#
+# Usage:
+#   doris-theme                     popup, confirm the flip, done
+#   doris-theme --flip-to nord      no popup (for scripts/keybind plumbing)
+#   doris-theme --flip-to gruvbox
+#   doris-theme --selftest          check the environment, change nothing
+
+set -euo pipefail
+
+GTK3_INI="$HOME/.config/gtk-3.0/settings.ini"
+GTK4_CSS="$HOME/.config/gtk-4.0/gtk.css"
+GTK4_CSS_DARK="$HOME/.config/gtk-4.0/gtk-dark.css"
+GTK4_VARIANTS="$HOME/.config/gtk-4.0/variants"
+MC_INI="$HOME/.config/mc/ini"
+BTOP_CONF="$HOME/.config/btop/btop.conf"
+
+GEANY_CONF="$HOME/.config/geany/geany.conf"
+ALACRITTY_CONF="$HOME/.config/alacritty/alacritty.toml"
+OB_RCXML="$HOME/.config/openbox/rc.xml"
+WALLS_CFG="$HOME/.config/wallpapers.cfg"
+BAK=".bak-doris-theme"
+
+say() { echo "doris-theme: $*"; }
+notify() {
+    if command -v notify-send >/dev/null 2>&1 && [[ -n "${DISPLAY:-}" ]]; then
+        notify-send -a doris-theme "$1" "${2:-}"
+    else
+        say "$1 ${2:+- $2}"
+    fi
+}
+
+# ── theme tables ─────────────────────────────────────────
+# per theme: gtk3_name  ob_name  geany_file  alacritty_file  wallpaper
+theme_vals() {
+    case "$1" in
+        nord)    echo "Nordic-master Nord-Openbox-theme-master Nordic-ld.conf Nord.toml palaver.jpg nord nord" ;;
+        gruvbox) echo "Gruvbox-Dark gruvbox-material-dark-blocks gruvbox-ld.conf Gruvbox-Dark.toml john-grimshaw4.jpg gruvbox gruvbox_material_dark" ;;
+        *) return 1 ;;
+    esac
+}
+
+current_theme() {
+    # state of record = the GTK3 theme name; a missing file means "not restored"
+    if [[ -f "$GTK3_INI" ]]; then
+        if grep -qi nord "$GTK3_INI"; then echo nord
+        elif grep -qi gruvbox "$GTK3_INI"; then echo gruvbox
+        else echo unknown; fi
+    else
+        echo unknown
+    fi
+}
+
+# sed-safe escaping of names like "gruvbox-ld.conf" and "palaver.jpg"
+esc() { printf '%s' "$1" | sed -e 's/[.[\*^$/]/\\&/g'; }
+
+sub() { # sub FILE old=OLDSTRING new=NEWSTRING  -- only fires if OLD is present
+    local f="$1" old="$2" new="$3"
+    if [[ ! -f "$f" ]]; then say "skip (absent): $f"; return 0; fi
+    if ! grep -q -- "$(esc "$old")" "$f" 2>/dev/null; then say "skip (not found): $old in $f"; return 0; fi
+    [[ -e "$f$BAK" ]] || cp "$f" "$f$BAK"
+    sed -i "s|$(esc "$old")|$(esc "$new")|g" "$f"
+    say "ok: $f"
+}
+
+# ── gtk4 css machinery ───────────────────────────────────
+seed_variant() { # seed_variant NAME SYSTEM_THEME_DIR
+    local name="$1" sysdir="$2"
+    local d="$GTK4_VARIANTS/$name"
+    if [[ ! -f "$d/gtk.css" && -f "$sysdir/gtk.css" ]]; then
+        mkdir -p "$d"
+        cp "$sysdir/gtk.css" "$sysdir/gtk-dark.css" "$d/" 2>/dev/null
+        say "seeded $name gtk4 pair from $sysdir"
+    fi
+}
+seed_gruvbox_from_live() { # first run anywhere: snapshot the current bespoke css
+    local d="$GTK4_VARIANTS/gruvbox"
+    if [[ ! -f "$d/gtk.css" && -f "$GTK4_CSS" ]]; then
+        mkdir -p "$d"
+        cp "$GTK4_CSS" "$GTK4_CSS_DARK" "$d/"
+        say "seeded gruvbox gtk4 pair from the live css"
+    fi
+}
+apply_gtk4() { # apply_gtk4 NEWTHEME SYSTEM_THEME_DIR
+    local sysdir="$2"
+    seed_gruvbox_from_live || true
+    seed_variant nord "/usr/share/themes/Nordic-master/gtk-4.0"
+    local src="$GTK4_VARIANTS/$1"
+    if [[ ! -f "$src/gtk.css" ]]; then src="$sysdir"; fi
+    if [[ -f "$src/gtk.css" ]]; then
+        [[ -e "$GTK4_CSS$BAK" ]] || { [[ -f "$GTK4_CSS" ]] && cp "$GTK4_CSS" "$GTK4_CSS$BAK"; }
+        [[ -e "$GTK4_CSS_DARK$BAK" ]] || { [[ -f "$GTK4_CSS_DARK" ]] && cp "$GTK4_CSS_DARK" "$GTK4_CSS_DARK$BAK"; }
+        cp "$src/gtk.css" "$GTK4_CSS"
+        cp "$src/gtk-dark.css" "$GTK4_CSS_DARK"
+        say "ok: gtk4 css <- $src"
+    else
+        say "skip: no gtk4 css found for $1"
+    fi
+}
+
+# ── wallpaper ────────────────────────────────────────────
+apply_wallpaper_now() { # re-set the CURRENT workspace's image (waldesk owns the rest)
+    { [[ -n "${DISPLAY:-}" ]] && command -v feh >/dev/null && command -v xprop >/dev/null; } || return 0
+    local cur line
+    cur=$(xprop -root _NET_CURRENT_DESKTOP 2>/dev/null | awk -F'= ' '{print $2}' | tr -dc 0-9) || cur=0
+    [[ -n "$cur" ]] || cur=0
+    line=$(grep -m1 "^[[:space:]]*\[DESKTOP_$cur\]" "$WALLS_CFG" 2>/dev/null | grep -oP 'feh .*' || true)
+    if [[ -n "$line" ]]; then
+        eval "$line" >/dev/null 2>&1 || true
+        say "wallpaper applied to desktop $cur"
+    fi
+}
+swap_wallpaper() { # OLDNAME NEWNAME - bidirectional name swap, positions/comments untouched
+    if [[ ! -f "$WALLS_CFG" ]]; then say "skip (absent): wallpapers.cfg"; return 0; fi
+    if ! grep -q "$(esc "$1")" "$WALLS_CFG" && ! grep -q "$(esc "$2")" "$WALLS_CFG"; then
+        say "skip: neither wallpaper named in wallpapers.cfg"; return 0
+    fi
+    [[ -e "$WALLS_CFG$BAK" ]] || cp "$WALLS_CFG" "$WALLS_CFG$BAK"
+    sed -i "s|$(esc "$1")|__SWAPDESK__|g; s|$(esc "$2")|$1|g; s|__SWAPDESK__|$2|g" "$WALLS_CFG"
+    say "ok: wallpapers.cfg"
+}
+
+# ── the flip ─────────────────────────────────────────────
+flip() { # flip NEW OLD
+    local n="$1" o="$2"
+    local -a a b
+    read -r -a a <<< "$(theme_vals "$n")"
+    read -r -a b <<< "$(theme_vals "$o")"
+
+    say "flipping $o -> $n"
+    sub "$GTK3_INI" "gtk-theme-name=${b[0]}" "gtk-theme-name=${a[0]}"
+    apply_gtk4 "$n" "/usr/share/themes/${a[0]}/gtk-4.0"
+    sub "$OB_RCXML" "<name>${b[1]}</name>" "<name>${a[1]}</name>"
+    if command -v openbox >/dev/null 2>&1 && [[ -n "${DISPLAY:-}" ]]; then
+        openbox --reconfigure 2>/dev/null || true
+        say "openbox reconfigured"
+    fi
+    sub "$GEANY_CONF" "color_scheme=${b[2]}" "color_scheme=${a[2]}"
+    sub "$ALACRITTY_CONF" "/${b[3]}\"" "/${a[3]}\""
+    swap_wallpaper "${b[4]}" "${a[4]}"
+    sub "$MC_INI" "skin=${b[5]}" "skin=${a[5]}"
+    sub "$BTOP_CONF" "color_theme = \"${b[6]}\"" "color_theme = \"${a[6]}\""
+    apply_wallpaper_now
+}
+
+# ── popup ────────────────────────────────────────────────
+ask_flip() { # ask_flip CURRENT NEW ; rc 0 = go
+    local uc uc2
+    uc="$(echo "$1" | tr '[:lower:]' '[:upper:]')"
+    uc2="$(echo "$2" | tr '[:lower:]' '[:upper:]')"
+    if [[ -n "${DISPLAY:-}" ]] && command -v zenity >/dev/null; then
+        zenity --question --title "Theme Flip" --width 420 \
+            --text "Currently wearing: $uc\n\nFlip it all to $uc2?\nGTK themes, window theme, geany, terminal, wallpaper.\n\nOpen apps: new windows pick it up; geany restarts to repaint." \
+            --ok-label "Flip to $uc2" --cancel-label "Keep $uc"
+    elif [[ -n "${DISPLAY:-}" ]] && command -v yad >/dev/null; then
+        yad --question --title "Theme Flip" --width 420 \
+            --text "Currently wearing: $uc.\nFlip it all to $uc2?" \
+            --button "Flip to $uc2:0" --button "Keep $uc:1"
+    else
+        printf 'doris-theme: wearing %s. Flip to %s? [y/N] ' "$uc" "$uc2"
+        local ans; read -r ans || return 1
+        [[ "$ans" =~ ^[yY] ]]
+    fi
+}
+
+# ── selftest ─────────────────────────────────────────────
+selftest() {
+    local fail=0
+    say "== selftest =="
+    ck() { if eval "$2"; then echo "PASS     $1"; else echo "FAIL     $1"; fail=1; fi; }
+    for c in zenity feh notify-send openbox xprop; do
+        ck "$c present" "command -v $c >/dev/null"
+    done
+    ck "nord themes in /usr/share" "[[ -d /usr/share/themes/Nordic-master && -d /usr/share/themes/Nord-Openbox-theme-master ]]"
+    ck "gruvbox themes in /usr/share" "[[ -d /usr/share/themes/Gruvbox-Dark && -d /usr/share/themes/gruvbox-material-dark-blocks ]]"
+    ck "nord gtk4 css" "[[ -f /usr/share/themes/Nordic-master/gtk-4.0/gtk.css ]]"
+    ck "settings.ini restored" "[[ -f $GTK3_INI ]]"
+    ck "rc.xml restored"      "[[ -f $OB_RCXML ]]"
+    ck "geany.conf restored"  "[[ -f $GEANY_CONF ]]"
+    ck "alacritty.toml present" "[[ -f $ALACRITTY_CONF ]]"
+    ck "wallpapers.cfg present" "[[ -f $WALLS_CFG ]]"
+    ck "alacritty Nord.toml shipped" "[[ -f $HOME/.config/alacritty/themes/Nord.toml ]]"
+    ck "btop themes (nord + gruvbox_material) shipped" "[[ -f /usr/share/btop/themes/nord.theme && -f /usr/share/btop/themes/gruvbox_material_dark.theme ]]"
+    ck "mc skins installed" "[[ -f $HOME/.config/mc/skins/nord.ini && -f $HOME/.config/mc/skins/gruvbox.ini ]]"
+    say "current theme: $(current_theme)"
+    if (( fail )); then exit 1; fi
+    say "all present - ready to flip"
+}
+
+# ── main ─────────────────────────────────────────────────
+main() {
+    case "${1:-}" in
+        --selftest|-t) selftest; exit 0 ;;
+        --flip-to)
+            local want cur
+            want="$(echo "${2:-}" | tr '[:upper:]' '[:lower:]')"
+            theme_vals "$want" >/dev/null || { say "unknown theme: '$2' (use nord or gruvbox)"; exit 2; }
+            cur="$(current_theme)"
+            [[ "$cur" == "$want" ]] && { say "already wearing $want - nothing to do"; exit 0; }
+            if [[ "$cur" == unknown ]]; then
+                say "cannot infer current theme (no settings.ini?) - flipping anyway"
+                cur="$( [[ "$want" == nord ]] && echo gruvbox || echo nord )"
+            fi
+            flip "$want" "$cur"
+            notify "Now wearing $want" "openbox + GTK + geany + terminal + mc + btop + wallpaper - geany repaints on restart"
+            exit 0
+            ;;
+        -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
+    esac
+    local cur new
+    cur="$(current_theme)"
+    case "$cur" in
+        gruvbox) new=nord ;;
+        nord)    new=gruvbox ;;
+        *) say "cannot infer current theme - is the desk restored?"; exit 2 ;;
+    esac
+    if ask_flip "$cur" "$new"; then
+        flip "$new" "$cur"
+        notify "Now wearing $new" "openbox + GTK + geany + terminal + mc + btop + wallpaper - geany repaints on restart"
+    else
+        say "keeping $cur - nothing changed"
+    fi
+}
+
+main "$@"

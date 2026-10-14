@@ -350,6 +350,12 @@
       </action>
     </keybind>
     <!--END SCROT-->
+    <keybind key="C-S-t">
+      <action name="Execute">
+        <command>~/bin/doris-theme</command>
+      </action>
+    </keybind>
+
     <keybind key="W-a">
       <action name="Execute">
         <startupnotify>

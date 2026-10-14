@@ -232,6 +232,22 @@ also lists the one-time credential chores that you may ignore completely:
 * **`~/bin/nbp`** needs a gpg secret key set as your default (nbp encrypts to
   your default secret key automatically — no key name hardcoded anymore).
 
+## Theme flip
+
+**Ctrl+Shift+T** (or right-click menu → "Theme Flip", right beneath Pianobar)
+flips the whole desk between **gruvbox and nord** in one shot with a small
+confirm: GTK3 + GTK4 themes, the Openbox window theme, geany's colorscheme,
+alacritty, mc's skin, btop's theme, and the wallpaper (gruvbox wears the
+painting, nord wears palaver). Already-open apps pick it up for new windows;
+geany repaints on restart, and mc/btop likewise take the new suit the next
+time you open them.
+
+The tool is `~/bin/doris-theme` — it reads the current theme back out of your
+config (no state file to go stale) and backs up every file it touches as
+`*.bak-doris-theme`. `--selftest` reports what's present; `--flip-to nord`
+flips without the popup. Both theme sets ship in the kit, so the flip works
+on a fresh install before you've touched anything.
+
 ## Options
 
 ```
