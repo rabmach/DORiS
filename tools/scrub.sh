@@ -6,7 +6,8 @@
 #   usage: cd ~/doris && ./tools/scrub.sh
 #
 # * replaces /home/<username> with /home/$USER in config files
-# * zeroes known secrets (weather OWM key, pianobar creds, nextdns ids)
+# * gates known secrets (weather OWM key, pianobar creds, nextdns ids): a
+#   real one stops the scrub - you remove it, rotate it, scrub again
 # * drops runtime-only dirs/files (cache, logs, ctl sockets, *.gpg leftovers)
 # * refuses to run while a working tree matches a git repo (protects remotes)
 #
@@ -60,20 +61,44 @@ for u in $USER homer john damo snortmerd bk; do
 done
 
 # ---- 2. secrets ----------------------------------------------
-scrub_file() {
-    local f="$1"
-    [[ -f "$f" ]] || return 0
-    sed -i \
-        -e 's|YOUR_OWM_API_KEY|YOUR_OWM_API_KEY|g' \
-        -e 's|dns\.nextdns\.io|dns.nextdns.io|g' \
-        "$f"
+# A real credential stops the scrub - loudly. The old code "zeroed" keys
+# with a sed that replaced the placeholder with itself (a no-op; found
+# 2026-10-12): a scrub that claims to clean secrets it never checks is a
+# locked door with no note. Nothing here auto-rewrites - what ships is
+# what you reviewed. Remove the secret by hand, rotate what it unlocks,
+# then scrub again.
+LEAKS=0
+leak() {
+    echo "!! SECRET: $*"
+    LEAKS=$((LEAKS + 1))
 }
-# weather key (if it leaked back in)
-scrub_file config/weather_sh.rc
-scrub_file bin/weather.sh
-# pianobar creds placeholder
-[[ -f config/pianobar/config ]] && \
-    sed -i 's|^user = .*|user = YOUR_PANDORA_USER|' config/pianobar/config
+
+# weather: bin/weather.sh reads its OpenWeatherMap key from this file
+if [[ -f config/weather_sh.rc ]] && ! grep -qx 'YOUR_OWM_API_KEY' config/weather_sh.rc; then
+    leak "config/weather_sh.rc carries a real OpenWeatherMap key (expected the YOUR_OWM_API_KEY line). Zero it by hand and rotate it."
+fi
+
+# pianobar: user must be the placeholder; password stays commented
+if [[ -f config/pianobar/config ]]; then
+    while IFS= read -r line; do
+        leak "config/pianobar/config: $line (expected 'user = YOUR_PANDORA_USER')."
+    done < <(grep -E '^ *user *=' config/pianobar/config 2>/dev/null | grep -Ev '^ *user *= *YOUR_PANDORA_USER *$')
+    while IFS= read -r line; do
+        leak "config/pianobar/config has an uncommented password line (comment it - password_command exists for this)."
+    done < <(grep -E '^ *password *=' config/pianobar/config 2>/dev/null)
+fi
+
+# nextdns: the bare DoH hostname is fine; a personal config id rides the path
+while IFS= read -r hit; do
+    leak "nextdns configuration id: $hit"
+done < <(grep -rInE 'nextdns\.io/[A-Za-z0-9]{3,}' config home bin local Pictures 2>/dev/null)
+
+if [[ "$LEAKS" -gt 0 ]]; then
+    echo "!! $LEAKS real credential(s) found - secrets are never auto-cleaned."
+    echo "   Remove them by hand, rotate what they unlock, then scrub again."
+    exit 1
+fi
+echo "  ok: no real credentials found (weather, pianobar, nextdns)."
 
 # ---- 3. runtime junk -----------------------------------------
 find config bin home local Pictures -type d \( \

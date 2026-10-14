@@ -15,7 +15,7 @@ source "$DORIS_DIR/lib.sh"
 
 header "SYSTEM-WIDE ICONS + THEMES"
 
-announce "YOUR LOOK" "Icons and themes land system-wide, so even apps running as root wear the same clothes - and Thunar takes the file-manager crown at the system level. Check-then-skip: a rerun touches only what changed. The desktop already feels like yours before you touch it."
+announce "YOUR LOOK" "Icons, themes and the Hack fonts land system-wide, so even apps running as root wear the same clothes - and Thunar takes the file-manager crown at the system level. Check-then-skip: a rerun touches only what changed. The desktop already feels like yours before you touch it."
 
 if [[ ! -d "$ASSET_ICONS" ]] && [[ ! -d "$ASSET_THEMES" ]]; then
     warn "No local theme/icon assets found. Skipping."
@@ -54,6 +54,32 @@ if [[ -d "$ASSET_THEMES" ]]; then
         sudo cp -R "$theme_dir" "$target"
         INSTALLED_ANY=1
     done
+fi
+
+# ── Fonts -> /usr/share/fonts (Hack Nerd Font) ───────────────
+# The kit's terminal font and the openbox/menu font family. Vendored
+# (SIL OFL license rides along) so a fresh install gets the nerd-font
+# iconography without the manual download-and-copy dance. Same
+# check-then-skip as the themes above; fc-cache runs only when a family
+# actually landed.
+FONT_INSTALLED=0
+if [[ -d "$ASSET_FONTS" ]]; then
+    for font_dir in "$ASSET_FONTS"/*/; do
+        [[ -d "$font_dir" ]] || continue
+        name=$(basename "$font_dir")
+        target="/usr/share/fonts/$name"
+        if [[ -d "$target" ]]; then
+            log "Font family '$name' already at $target - skipped."
+            continue
+        fi
+        log "Installing font family '$name' -> $target ..."
+        sudo cp -R "$font_dir" "$target"
+        FONT_INSTALLED=1
+    done
+    if [[ "$FONT_INSTALLED" == "1" ]] && command -v fc-cache &>/dev/null; then
+        log "Refreshing font cache..."
+        sudo fc-cache -f >/dev/null 2>&1 || true
+    fi
 fi
 
 # ── Refresh icon caches only if we installed something ──────

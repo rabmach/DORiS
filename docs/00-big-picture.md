@@ -63,7 +63,7 @@ once, then the per-user half for each user.
    ├─ 01-connection router vs direct-ISP → DNS mode        (auto)
    ├─ 02-repos      Mozilla, Helium, Sublime
    ├─ 03-packages   core.list + Intel/AMD microcode + VA-API (auto)
-   ├─ 04-assets     icons + themes → /usr/share
+   ├─ 04-assets     icons + themes + Hack fonts → /usr/share
    ├─ 05-hardening  nftables, DNS, journald caps,
    │                ramdisk tmpfs, CPU governor, sysctls
    ├─ 05-tweaks     tty banner, Ctrl+Alt+Backspace, tty1 → startx
@@ -87,7 +87,7 @@ once, then the per-user half for each user.
 | `01-connection` | detect trusted-LAN vs direct-ISP → DNS posture | one kit, two network realities |
 | `02-repos` | Mozilla, Helium, Sublime Text; key fingerprints verified | only trusted, verified sources |
 | `03-packages` | `packages/core.list` + auto-detected microcode/VA-API | curated set, hardware-aware |
-| `04-assets` | icons + themes → `/usr/share` | root apps match the desktop |
+| `04-assets` | icons + themes + Hack fonts → `/usr/share` | root apps match the desktop |
 | `05-hardening` | nftables, DNS, journald caps, debsecan, ramdisk, governor, sysctls | security is part of the restore |
 | `05-tweaks` | tty banner, kill-X, boot to multi-user + tty1 startx | pleasant, keyboard-driven login |
 | `06-verify` | confirms the important bits took, writes marker | the kit proves itself, or fails loudly |

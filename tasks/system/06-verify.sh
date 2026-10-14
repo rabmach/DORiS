@@ -33,6 +33,7 @@ check "nftables is active" systemctl is-active nftables
 check "nftables rules loaded" nft list ruleset
 check "journald is capped" bash -c "grep -q SystemMaxUse /etc/systemd/journald.conf"
 check "debsecan cron installed" test -f /etc/cron.d/debsecan
+check "Hack Nerd Font installed" bash -c "fc-list | grep -q 'Hack Nerd Font'"
 
 MODE="$(state_get mode)"
 DNS_TARGET="$(doris_dns_server)"

@@ -148,7 +148,7 @@ file, so a second user — or a re-run — is safe.
 | 01-connection | **auto-detects** trusted-LAN vs direct-ISP and picks the DNS strategy (see Security) |
 | 02-repos | apt repos: Mozilla (Firefox), Helium, Sublime Text; key fingerprints verified |
 | 03-packages | full core package list (see `packages/core.list`) + stock kernel + vendor microcode (auto-detected) + optional extras |
-| 04-assets | **icons + themes → `/usr/share`** so root apps match; icon caches rebuilt; nothing in `~/.local` |
+| 04-assets | **icons + themes + Hack fonts → `/usr/share`** so root apps match; icon caches rebuilt; nothing in `~/.local` |
 | 05-hardening | nftables, DNS (router pin; direct links get a plain warning), journald caps, debsecan cron, ramdisk tmpfs, CPU governor, sysctl drop-ins (`hardening/sysctl.d/60-doris-*.conf`) |
 | 05-tweaks | loginfetch tty banner (dynamic `/etc/issue` on every tty login), Ctrl+Alt+Backspace kill-X, boot to multi-user + tty1 autostart X |
 | 06-verify | confirms the important bits took, writes the install marker |
@@ -265,7 +265,7 @@ DORiS/
 ├── config/               ~/.config (tokenized with $USER / $HOSTNAME)
 ├── home/                 dotfiles + films.txt
 ├── bin/                  ~/bin scripts (incl. doris-welcome)
-├── local/share/          icons, themes, Thunar scripts (→ /usr/share)
+├── local/share/          icons, themes, fonts, Thunar scripts (→ /usr/share)
 ├── Pictures/backgrounds/ wallpapers
 ├── hardening/            nftables, journald, udev, systemd, cron, sysctl.d, loginfetch
 └── tools/                selftest.sh, mkwelcome.sh, capture.sh, scrub.sh
@@ -302,8 +302,9 @@ cd ~/DORiS && tools/capture.sh && tools/scrub.sh
 
 `capture.sh` re-vendors `~/.config`, `~/bin`, `~/.local`, `~/Pictures`,
 `~/home` dotfiles and the `/etc` hardening files. `scrub.sh` walks the
-result and strips usernames, keys, and runtime junk. Review the diff before
-committing.
+result and strips usernames and runtime junk - and stops you cold if a
+real key (weather, pianobar, nextdns) is still in there. Review the diff
+before committing.
 
 ---
 

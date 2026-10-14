@@ -27,7 +27,12 @@ mkdir -p "$DORIS_DIR/config"
 for item in "$H"/.config/*; do
     n=$(basename "$item")
     case "$n" in
-        mozilla|net.imput.helium|doris-backups|systemd|opencode) continue ;;
+        # browsers keep logins and cookies - never vendor
+        mozilla|net.imput.helium) continue ;;
+        # app configs that carry real credentials - never vendor
+        claws-mail|filezilla|keepassxc|seahorse|pulse) continue ;;
+        # machine-local / tooling state - not part of the kit
+        doris-backups|systemd|opencode) continue ;;
     esac
     cp -a "$item" "$DORIS_DIR/config/$n"
 done
@@ -48,6 +53,12 @@ done
 for ic in Dracula kora default; do
     [[ -d /usr/share/icons/$ic ]] && { rm -rf "$DORIS_DIR/local/share/icons/$ic"; cp -a "/usr/share/icons/$ic" "$DORIS_DIR/local/share/icons/"; }
 done
+# icon caches are machine-generated; task 04 rebuilds them at restore -
+# never vendor one into the kit
+find "$DORIS_DIR/local/share/icons" -name icon-theme.cache -delete 2>/dev/null || true
+# the Hack font ships with the kit; re-vendor it if the live box updated it
+mkdir -p "$DORIS_DIR/local/share/fonts"
+[[ -d /usr/share/fonts/Hack ]] && { rm -rf "$DORIS_DIR/local/share/fonts/Hack"; cp -a /usr/share/fonts/Hack "$DORIS_DIR/local/share/fonts/"; }
 if [[ -d /usr/share/themes ]]; then
     for th in /usr/share/themes/*; do
         [[ -d "$th" ]] && { rm -rf "$DORIS_DIR/local/share/themes/$(basename "$th")"; cp -a "$th" "$DORIS_DIR/local/share/themes/"; }

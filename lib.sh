@@ -42,6 +42,7 @@ export DORIS_USER_STATE="$CURRENT_HOME/.config/doris"
 export ASSET_ICONS="$DORIS_DIR/local/share/icons"
 export ASSET_THEMES="$DORIS_DIR/local/share/themes"
 export ASSET_SCRIPTS="$DORIS_DIR/local/share/scripts"
+export ASSET_FONTS="$DORIS_DIR/local/share/fonts"
 export HARDEN_DIR="$DORIS_DIR/hardening"
 
 # A reasonable default router DNS when the gateway can't be detected.

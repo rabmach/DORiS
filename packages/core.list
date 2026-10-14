@@ -194,6 +194,8 @@ nftables
 debsecan
 
 # --- utilities ---
+# file - the token engine + selftest read MIME types with it
+file
 apt-utils
 aptitude
 curl

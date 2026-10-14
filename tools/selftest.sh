@@ -18,6 +18,7 @@
 ###   * no ~/.local/share/icons|themes references in config/ (system-wide now)
 ###   * every icon referenced by menu.xml exists under local/share/icons
 ###   * the GTK theme/icon names in settings resolve under local/share
+###   * the openbox theme in rc.xml and geany's color_scheme resolve in the kit
 ###   * home/films.txt present, package lists parse, hardening intact
 set -Euo pipefail
 
@@ -38,7 +39,7 @@ soft() { echo "  [WARN] $*"; WARN=$((WARN + 1)); }
 say "== DORiS kit self-test =="
 
 # ── 0. kit structure ─────────────────────────────────────────
-for d in config bin home local/share/icons local/share/themes local/share/scripts \
+for d in config bin home local/share/icons local/share/themes local/share/fonts local/share/scripts \
          Pictures hardening packages tools tasks/system tasks/user; do
     [[ -d "$d" ]] || hard "missing directory: $d"
 done
@@ -115,6 +116,27 @@ if [[ -f config/gtk-3.0/settings.ini ]]; then
             soft "gtk setting references '$name' not found in kit assets (may come from a package)"
         fi
     done
+fi
+
+# ── 5b. the openbox theme in rc.xml must resolve in the kit ──
+if [[ -f config/openbox/rc.xml ]]; then
+    ob_theme=$(sed -n '/<theme>/,/<\/theme>/p' config/openbox/rc.xml \
+        | grep -m1 -oE '<name>[^<]+</name>' | sed -E 's|</?name>||g')
+    if [[ -z "$ob_theme" ]]; then
+        hard "rc.xml names no openbox theme"
+    elif [[ ! -d "local/share/themes/$ob_theme" ]]; then
+        hard "rc.xml theme '$ob_theme' not vendored under local/share/themes"
+    fi
+fi
+
+# ── 5c. geany's color_scheme must resolve in the kit ─────────
+if [[ -f config/geany/geany.conf ]]; then
+    scheme=$(grep -oP '^color_scheme=\K.*' config/geany/geany.conf 2>/dev/null)
+    if [[ -z "$scheme" ]]; then
+        soft "geany.conf sets no color_scheme"
+    elif [[ ! -f "config/geany/colorschemes/$scheme" ]]; then
+        hard "geany color_scheme '$scheme' missing from config/geany/colorschemes/"
+    fi
 fi
 
 # ── 6. films.txt (a doris staple) ────────────────────────────

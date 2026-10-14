@@ -14,6 +14,7 @@ secrets/
 restore-errors.log
 restore.log
 backups/
+icon-theme.cache
 
 # editors / os
 *.swp

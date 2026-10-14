@@ -1,13 +1,13 @@
 [general]
 import = [
-    "~/.config/alacritty/themes/Nord.toml "
+    "~/.config/alacritty/themes/Gruvbox-Dark.toml"
 ]
 
 [font]
 size = 11.0
 
 [font.normal]
-family = "DejaVuSansMono"
+family = "Hack Nerd Font Mono"
 style = "Regular"
 
 [window]
