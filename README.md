@@ -2,8 +2,7 @@
 
 Newcomers don't usually land on Debian + Openbox — that's a choice people make
 after they've been burned by a desktop war, or fallen for the blank-canvas
-minimalism. DORiS won't mint that taste; it will *meet* it, perfectly, the
-moment someone has it. [Get there from here.](docs/01-the-path.md)
+minimalism. DORiS won't mint that taste; it will *meet* it, though, as it has for me, and them, and maybe you, too. [Get there from here.](docs/01-the-path.md)
 
 DORiS is a desktop restoration system for **any amd64 machine** running Debian
 trixie. It was initially a handy way for me to restore my own setup after a net-install, and it still is, but, being machine agnostic makes it a cool thing to share. Run it after a fresh net-install and it recreates the "DORiS" desktop —
@@ -14,19 +13,14 @@ Menus, keys, firewall, welcome screen. It's a whole 'nother level, right in
 your pocket. Heh, or, at least I think so. I have been running the <a target="_blank" href="https://github.com/tycho-kirchner/fastcompmgr" title="fastcompmgr">fastcompmgr</a> compositor for some years and it's been great so it's included in DORiS run from ~/bin.
 
 ![The DORiS desktop](docs/images/doris1.jpg)
-*DORiS desktop — Openbox, keyboard-driven, tuned. Gruvbox-dark shown, nord is in there, too, gnome apps cooperate; it's all good.*
+*DORiS desktop — Openbox, keyboard-driven, tuned. Gruvbox-dark shown, nord is in there, too, gnome apps cooperate; it's all good. In fact, hit c'tarl+shift+t one time.*
 
 ## Why DORiS
 
-DORiS is a disposition: a humanist's way of computing, where the machine bends to how you
-think, not the other way around. The hundred hours of "how I like my box"
-written down, so a fresh install comes out the other side already home.
+DORiS is a disposition, I think: a humanist's way of computing, and the machine bends to how you or I think, not the other way around. The hundred(s) hours of "how I like my box" finally codified, so a fresh install comes out the other side done and done. Really, it's just digs on Debian, but, they's good digs. I mean, why build a distro when you can just Debian, whiff?
 
-Everything you need is at the ready — a keybind or a handy alias or a script
-away. All your keys work before you even learn they exist. Everything works
-every time, all of the time, the way you actually want it to. Security is built
-in. Automagic is built in. Of course it is — this is a power user's machine.
-Robust. Reliable. The kind you can be productive on all day.
+What you get is a solid, reliable 'workstation' already well provisioned with a butt-load of handy function at the ready — a keybind or a handy alias or a script
+away. Add or remove what you like to make DORiS even better for you, if you like, and it's easy to do so. Everything works every time, all of the time, the way you actually want it to. This is a proper desktop paradigm. Robust. Reliable. The kind you can be productive on all day because I am becuase DORiS is my desktop on Debian Linux that I have been using reliably for...decades, small tweaks notwithstanding. 
 
 **Whaddya want for nuthin'?**
 
@@ -167,7 +161,7 @@ DORiS is the foundation; the handy tools are the family that lives on it. Two sh
 
 - **lockd** — one-word file/directory encryption, right-click to keybind. On by default: it's a *function*, not a taste. Standalone repo: [rabmach/lockd](https://github.com/rabmach/lockd) (DORiS embeds a snapshot; the repo is upstream-of-record).
 
-Others (brenda, nina, RandomLitB, george) live on their own — clone what you want. brenda can be pretty handy; george (keyboard-first dashboard/command center) is all-inclusive at [rabmach/george](https://github.com/rabmach/george).
+Others (brenda, nina, RandomLitB, george) live on their own — clone what you want. brenda can be pretty handy; george (keyboard-first dashboard/command center) is all-inclusive at [rabmach/george](https://github.com/rabmach/george) and it's silly and noboody asked for it, ever, and it's awesome.
 
 ## Applying updates
 
@@ -234,7 +228,7 @@ also lists the one-time credential chores that you may ignore completely:
 
 ## Theme flip
 
-**Ctrl+Shift+T** (or right-click menu → "Theme Flip", right beneath Pianobar)
+**Ctrl+Shift+T** (or right-click menu → "looker", right beneath Pianobar)
 flips the whole desk between **gruvbox and nord** in one shot with a small
 confirm: GTK3 + GTK4 themes, the Openbox window theme, geany's colorscheme,
 alacritty, mc's skin, btop's theme, the wallpaper (gruvbox wears the
@@ -298,8 +292,8 @@ resolve `$HOME` in config files at runtime, so the kit ships no hardcoded userna
 ## Known limitations (honest gaps)
 
 * **Openbox/X11 only** — no Wayland configuration. DORiS detects a Wayland
-  session and warns, then stays X11.
-* **amd64 Debian trixie only** — that's the supported surface, on purpose for right now.
+  session and warns, then stays X11. I built-up a labwc desktop tjhis summer and it was fine and it was also a pain in the ass; currently. Will revisit. 
+* **amd64 Debian trixie only** — that's the supported surface; Debian stable.
 * **Opinionated by design** — it recreates this way of computing, not a menu
   of desktop choices. Your keys, your panel, your wallpapers, a config'd reliable setup.
 * **Outbound firewall is all-TCP** — FTPS passive data channels negotiate
