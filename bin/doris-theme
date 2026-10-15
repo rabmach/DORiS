@@ -10,6 +10,13 @@
 #   6. wallpaper ~/.config/wallpapers.cfg           image names swapped in place
 #   7. mc        ~/.config/mc/ini                   skin= (skins in ./skins)
 #   8. btop      ~/.config/btop/btop.conf           color_theme=
+#   9. GTK2      ~/.gtkrc-2.0                       include line - dresses the
+#                                                  GTK2 apps: logout dialog,
+#                                                  lxpanel. Close mc before
+#                                                  flipping: on quit mc REWRITES
+#                                                  its own ini, so an mc that was
+#                                                  born in the old theme will paint
+#                                                  the old skin back.
 #
 # The current theme is inferred from the config itself - no state file to go
 # stale. Every touched file gets a .bak-doris-theme backup the first time.
@@ -28,6 +35,7 @@ GTK4_CSS_DARK="$HOME/.config/gtk-4.0/gtk-dark.css"
 GTK4_VARIANTS="$HOME/.config/gtk-4.0/variants"
 MC_INI="$HOME/.config/mc/ini"
 BTOP_CONF="$HOME/.config/btop/btop.conf"
+GTKRC2="$HOME/.gtkrc-2.0"
 
 GEANY_CONF="$HOME/.config/geany/geany.conf"
 ALACRITTY_CONF="$HOME/.config/alacritty/alacritty.toml"
@@ -154,6 +162,7 @@ flip() { # flip NEW OLD
     swap_wallpaper "${b[4]}" "${a[4]}"
     sub "$MC_INI" "skin=${b[5]}" "skin=${a[5]}"
     sub "$BTOP_CONF" "color_theme = \"${b[6]}\"" "color_theme = \"${a[6]}\""
+    sub "$GTKRC2" "themes/${b[0]}/gtk-2.0" "themes/${a[0]}/gtk-2.0"
     apply_wallpaper_now
 }
 
@@ -196,6 +205,8 @@ selftest() {
     ck "alacritty Nord.toml shipped" "[[ -f $HOME/.config/alacritty/themes/Nord.toml ]]"
     ck "btop themes (nord + gruvbox_material) shipped" "[[ -f /usr/share/btop/themes/nord.theme && -f /usr/share/btop/themes/gruvbox_material_dark.theme ]]"
     ck "mc skins installed" "[[ -f $HOME/.config/mc/skins/nord.ini && -f $HOME/.config/mc/skins/gruvbox.ini ]]"
+    ck "gtkrc-2.0 present" "[[ -f $GTKRC2 ]]"
+    ck "gtk2 themes shipped" "[[ -d /usr/share/themes/Gruvbox-Dark/gtk-2.0 && -d /usr/share/themes/Nordic-master/gtk-2.0 ]]"
     say "current theme: $(current_theme)"
     if (( fail )); then exit 1; fi
     say "all present - ready to flip"

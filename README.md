@@ -237,10 +237,13 @@ also lists the one-time credential chores that you may ignore completely:
 **Ctrl+Shift+T** (or right-click menu → "Theme Flip", right beneath Pianobar)
 flips the whole desk between **gruvbox and nord** in one shot with a small
 confirm: GTK3 + GTK4 themes, the Openbox window theme, geany's colorscheme,
-alacritty, mc's skin, btop's theme, and the wallpaper (gruvbox wears the
-painting, nord wears palaver). Already-open apps pick it up for new windows;
-geany repaints on restart, and mc/btop likewise take the new suit the next
-time you open them.
+alacritty, mc's skin, btop's theme, the wallpaper (gruvbox wears the
+painting, nord wears palaver), and even the GTK2 include — dressing the
+logout dialog and the panel too. Already-open apps pick it up for new
+windows; geany repaints on restart, and mc/btop likewise take the new suit
+the next time you open them. One habit to know: close mc *before* flipping —
+when mc quits it rewrites its own config, so an mc born in the old theme
+will paint the old skin back when it exits.
 
 The tool is `~/bin/doris-theme` — it reads the current theme back out of your
 config (no state file to go stale) and backs up every file it touches as
