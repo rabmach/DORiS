@@ -355,7 +355,16 @@
         <command>~/bin/doris-theme</command>
       </action>
     </keybind>
-
+        <keybind key="C-S-n">
+      <action name="Execute">
+        <command>~/bin/doris-theme  --flip-to nord</command>
+      </action>
+    </keybind>
+            <keybind key="C-S-g">
+      <action name="Execute">
+        <command>~/bin/doris-theme  --flip-to gruvbox</command>
+      </action>
+    </keybind>
     <keybind key="W-a">
       <action name="Execute">
         <startupnotify>
