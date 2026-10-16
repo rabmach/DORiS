@@ -1,0 +1,269 @@
+#!/usr/bin/env python3
+"""streamrec - record an Icecast/ICY MP3 stream into a continuous show file,
+splitting per-track files whenever the server's StreamTitle metadata changes.
+
+Designed for cron: one invocation per show slot. The script computes its own
+duration from --end (midnight-crossing safe) and hard-stops then, reconnecting
+through network drops until that moment. Every stream byte is tee'd into BOTH
+the show file and the current track file, so the continuous archive stays
+complete no matter how sparsely the station tags its songs.
+
+Example crontab line:
+  0 6 * * 1-5 $HOME/bin/streamrec --url https://host/live \
+      --show wicn-morning --end 09:00 >> $HOME/.local/state/streamrec.log 2>&1
+"""
+
+import argparse
+import datetime as dt
+import os
+import re
+import signal
+import sys
+import time
+import unicodedata
+import urllib.request
+
+try:
+    from mutagen.id3 import ID3, TIT2, TPE1
+    HAS_MUTAGEN = True
+except ImportError:
+    HAS_MUTAGEN = False
+
+UA = "streamrec/1.0"
+RETRY_WAIT = 5
+READ_SIZE = 8192
+MAX_DURATION = 14 * 3600
+
+
+def say(msg):
+    print(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}", flush=True)
+
+
+def parse_hhmm(s):
+    m = re.fullmatch(r"(\d{1,2}):(\d{2})", s)
+    if not m:
+        raise argparse.ArgumentTypeError("time must be HH:MM")
+    h, mi = int(m.group(1)), int(m.group(2))
+    if not (0 <= h < 24 and 0 <= mi < 60):
+        raise argparse.ArgumentTypeError(f"invalid time {s!r}")
+    return h, mi
+
+
+def seconds_until(h, mi, now=None):
+    now = now or dt.datetime.now()
+    end = now.replace(hour=h, minute=mi, second=0, microsecond=0)
+    if end <= now:
+        end += dt.timedelta(days=1)
+    return int((end - now).total_seconds())
+
+
+def safe_name(title):
+    t = unicodedata.normalize("NFKD", title).encode("ascii", "ignore").decode()
+    t = re.sub(r"[^\w\s()-]", "", t)
+    t = re.sub(r"\s+", "_", t.strip())
+    return t[:120]
+
+
+class Recorder:
+    def __init__(self, url, label, base, deadline, min_track):
+        self.url = url
+        self.label = label
+        self.deadline = deadline
+        self.min_track = min_track
+        self.start = time.time()
+        self.outdir = os.path.join(os.path.expanduser(base), time.strftime("%Y-%m"))
+        os.makedirs(self.outdir, exist_ok=True)
+        stamp = time.strftime("%Y-%m-%d_%H%M")
+        self.show_path = os.path.join(self.outdir, f"{label}_{stamp}.mp3")
+        self.show_fp = open(self.show_path, "wb")
+        self.track_fp = None
+        self.track_key = None
+        self.track_title = ""
+        self.track_path = None
+        self._warned_no_mutagen = False
+        self.track_start = 0.0
+        self.track_count = 0
+        self.reconnects = 0
+        self.bytes_written = 0
+        self.stopping = False
+
+    def uniq(self, path):
+        root, ext = os.path.splitext(path)
+        cand, n = path, 1
+        while os.path.exists(cand):
+            n += 1
+            cand = f"{root}-{n}{ext}"
+        return cand
+
+    def open_track(self, title):
+        self.close_track()
+        hhmm = time.strftime("%H%M")
+        base = safe_name(title) or f"{hhmm}_{self.label}"
+        path = self.uniq(os.path.join(self.outdir, f"{hhmm}_{base}.mp3"))
+        self.track_path = path
+        self.track_fp = open(path, "wb")
+        self.track_key = base
+        self.track_title = title
+        self.track_start = time.time()
+        self.track_count += 1
+        say(f"track {self.track_count}: {os.path.basename(path)}")
+
+    def tag_track(self, path):
+        # ID3 for standalone runs: StreamTitle 'Artist - Title' -> TPE1 + TIT2
+        if not HAS_MUTAGEN:
+            if not self._warned_no_mutagen:
+                say("mutagen not installed - track files saved untagged")
+                self._warned_no_mutagen = True
+            return
+        title = getattr(self, "track_title", "") or ""
+        artist, sep, song = title.partition(" - ")
+        if not sep or not song:
+            artist, song = "", title
+        try:
+            try:
+                tags = ID3(path)
+            except Exception:
+                tags = ID3()
+            if artist:
+                tags.add(TPE1(encoding=3, text=artist))
+            tags.add(TIT2(encoding=3, text=song or os.path.basename(path)))
+            tags.save(path, v2_version=3)
+        except Exception as e:
+            say(f"tagging {os.path.basename(path)} failed: {e}")
+
+    def close_track(self):
+        if self.track_fp:
+            self.track_fp.close()
+            self.tag_track(self.track_path)
+            self.track_fp = None
+            self.track_key = None
+
+    def handle_meta(self, resp):
+        ln = resp.read(1)
+        if not ln:
+            raise ConnectionError("EOF inside metadata length byte")
+        n = ln[0]
+        if not n:
+            return
+        blk = resp.read(n * 16).decode("latin1", "replace")
+        m = re.search(r"StreamTitle='([^']*)'", blk)
+        if not m:
+            return
+        title = m.group(1).strip()
+        if not title:
+            return
+        key = safe_name(title)
+        age = time.time() - self.track_start
+        if self.track_fp is None:
+            self.open_track(title)
+        elif key != self.track_key and age >= self.min_track:
+            self.open_track(title)
+
+    def record_once(self, resp, metaint):
+        to_boundary = metaint
+        while not self.stopping and time.time() < self.deadline:
+            want = READ_SIZE if metaint is None else min(READ_SIZE, to_boundary)
+            data = resp.read(want)
+            if not data:
+                raise ConnectionError("stream ended unexpectedly")
+            self.show_fp.write(data)
+            self.bytes_written += len(data)
+            if self.track_fp:
+                self.track_fp.write(data)
+            if metaint is not None:
+                to_boundary -= len(data)
+                if to_boundary == 0:
+                    self.handle_meta(resp)
+                    to_boundary = metaint
+
+    def finish(self):
+        self.close_track()
+        self.show_fp.close()
+        mins = (time.time() - self.start) / 60
+        mb = self.bytes_written / 1048576
+        say(f"done: {mb:.1f} MB in {mins:.1f} min -> {self.show_path} "
+            f"({self.track_count} track files, {self.reconnects} reconnects)")
+
+
+def connect(url, want_meta=True):
+    headers = {"User-Agent": UA}
+    if want_meta:
+        headers["Icy-MetaData"] = "1"
+    req = urllib.request.Request(url, headers=headers)
+    resp = urllib.request.urlopen(req, timeout=15)
+    ctype = resp.headers.get("Content-Type", "")
+    if ctype and not ctype.startswith("audio/"):
+        resp.close()
+        raise ConnectionError(f"Content-Type {ctype!r} is not audio; refusing to save")
+    mi = resp.headers.get("icy-metaint", "").strip()
+    metaint = int(mi) if mi.isdigit() else None
+    return resp, metaint
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        description="record an ICY MP3 stream; split tracks on StreamTitle changes")
+    ap.add_argument("--url", required=True)
+    ap.add_argument("--show", required=True, help="label used in output filenames")
+    ap.add_argument("--end", required=True, type=parse_hhmm,
+                    help="stop time HH:MM local (wraps past midnight)")
+    ap.add_argument("--base", default="~/Music",
+                    help="output root; a YYYY-MM dir is created inside (default ~/Music)")
+    ap.add_argument("--min-track-secs", type=int, default=25,
+                    help="min seconds in a segment before a title change may rotate it")
+    ap.add_argument("--no-tracks", action="store_true",
+                    help="continuous show file only; skips track rotation and the "
+                         "metadata request (pure byte copy of the stream)")
+
+    args = ap.parse_args()
+
+    dur = seconds_until(*args.end)
+    if dur > MAX_DURATION:
+        hhmm = f"{args.end[0]:02d}:{args.end[1]:02d}"
+        sys.exit(f"--end {hhmm} lies more than 14h ahead; refusing (wrong day?)")
+
+    rec = Recorder(args.url, args.show, args.base, time.time() + dur,
+                   args.min_track_secs)
+    want_meta = not args.no_tracks
+
+    def bye(signum, frame):
+        rec.stopping = True
+
+    signal.signal(signal.SIGTERM, bye)
+    signal.signal(signal.SIGINT, bye)
+
+    say(f"start: {args.url} -> {rec.show_path} "
+        f"(until {args.end[0]:02d}:{args.end[1]:02d}, {dur // 60} min)")
+
+    resp = None
+    while not rec.stopping and time.time() < rec.deadline:
+        try:
+            resp, metaint = connect(args.url, want_meta)
+            if not want_meta:
+                metaint = None
+                say("connected: --no-tracks, pure byte copy")
+            if metaint:
+                say(f"connected: splitting on metadata every {metaint} bytes")
+            else:
+                say("connected: no icy-metaint header, continuous file only")
+            rec.record_once(resp, metaint)
+        except OSError as e:
+            rec.reconnects += 1
+            say(f"error #{rec.reconnects}: {e}; retrying in {RETRY_WAIT}s")
+            for _ in range(RETRY_WAIT):
+                if rec.stopping:
+                    break
+                time.sleep(1)
+        finally:
+            if resp is not None:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
+                resp = None
+
+    rec.finish()
+
+
+if __name__ == "__main__":
+    main()
