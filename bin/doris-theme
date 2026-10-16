@@ -25,6 +25,9 @@
 #   doris-theme                     popup, confirm the flip, done
 #   doris-theme --flip-to nord      no popup (for scripts/keybind plumbing)
 #   doris-theme --flip-to gruvbox
+#   doris-theme --say "TEXT" --flip-to X   custom toast instead of the summary
+#                                          (cron-friendly: works without X once
+#                                          DBUS_SESSION_BUS_ADDRESS resolves)
 #   doris-theme --selftest          check the environment, change nothing
 
 set -euo pipefail
@@ -44,12 +47,19 @@ WALLS_CFG="$HOME/.config/wallpapers.cfg"
 BAK=".bak-doris-theme"
 
 say() { echo "doris-theme: $*"; }
-notify() {
-    if command -v notify-send >/dev/null 2>&1 && [[ -n "${DISPLAY:-}" ]]; then
-        notify-send -a doris-theme "$1" "${2:-}"
-    else
-        say "$1 ${2:+- $2}"
+bus() { export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=/run/user/$(id -u)/bus}"; }
+notify() { # notify TITLE [BODY] - works on the desktop AND from cron (self-locates the bus)
+    if command -v notify-send >/dev/null 2>&1 && bus && notify-send -a doris-theme "$1" "${2:-}" 2>/dev/null; then
+        return 0
     fi
+    say "$1 ${2:+- $2}"
+}
+pop() { # pop BODY [SECS=3] - timed toast for --say (matches the films pop-up family)
+    local secs=$(( ${2:-3} * 1000 ))
+    if command -v notify-send >/dev/null 2>&1 && bus && notify-send -t "$secs" -a doris-theme "doris-theme" "$1" 2>/dev/null; then
+        return 0
+    fi
+    say "$1"
 }
 
 # ── theme tables ─────────────────────────────────────────
@@ -214,6 +224,18 @@ selftest() {
 
 # ── main ─────────────────────────────────────────────────
 main() {
+    local SAY=""
+    local args=()
+    while [[ $# -gt 0 ]]; do
+        if [[ "$1" == "--say" ]]; then
+            SAY="${2:-}"
+            shift 2
+        else
+            args+=("$1")
+            shift
+        fi
+    done
+    set -- ${args[@]+"${args[@]}"}
     case "${1:-}" in
         --selftest|-t) selftest; exit 0 ;;
         --flip-to)
@@ -227,10 +249,14 @@ main() {
                 cur="$( [[ "$want" == nord ]] && echo gruvbox || echo nord )"
             fi
             flip "$want" "$cur"
-            notify "Now wearing $want" "openbox + GTK + geany + terminal + mc + btop + wallpaper - geany repaints on restart"
+            if [[ -n "$SAY" ]]; then
+                pop "$SAY"
+            else
+                notify "Now wearing $want" "openbox + GTK + geany + terminal + mc + btop + wallpaper - geany repaints on restart"
+            fi
             exit 0
             ;;
-        -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,21p' "$0"; exit 0 ;;
     esac
     local cur new
     cur="$(current_theme)"
