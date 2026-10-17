@@ -257,6 +257,28 @@ config (no state file to go stale) and backs up every file it touches as
 flips without the popup. Both theme sets ship in the kit, so the flip works
 on a fresh install before you've touched anything.
 
+## Backing out — the wrist-flick undo
+
+DORiS is a decision, not an app: it *replaces* your shell files, sets
+system defaults, and plants handy things. Everything it touched is backed
+up first, into `<kit>/backups/<timestamp>/` — and backing OUT is one
+command now, shipped as `doris-backout` (installed to ~/bin):
+
+    doris-backout                        # dry run - shows the plan, moves nothing
+    sudo doris-backout --apply           # full restore, including system defaults (root)
+    doris-backout --apply --quiet        # non-interactive: newer-file conflicts get
+                                         # deferred to a list, never clobbered silently
+
+It restores the backed-up originals (oldest snapshot first - that one holds
+the true pre-restore state), *asks* before overwriting anything newer than
+the backup copy (protects the work you did since testing - a tty-less run
+defers those to a list instead), lists everything DORiS delivered that had
+no original (watch-list: nothing auto-deleted), and - with root rights -
+undoes the system-state defaults (file-manager/text-editor alternatives,
+the xdg-mime handler) back to values the kit *captured before altering
+them*. Nothing gets deleted by backout itself; the backup stays until you
+personally shred it. See `doris-backout --help` for knobs.
+
 ## Options
 
 ```

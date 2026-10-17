@@ -1,0 +1,199 @@
+#!/bin/bash
+# doris-backout - put the originals back. The wrist-flick DORiS promised and
+# only offered as raw materials until now.
+#
+# DORiS backs up every file it replaces (both halves, each into
+# <kit>/backups/<timestamp>/) with paths stored as the ORIGINAL absolute
+# path minus the leading slash (home/<user>/.bashrc, etc/nftables.conf).
+# This script walks those snapshots back in - oldest snapshot first, since
+# the oldest holds the true pre-restore state.
+#
+# Safety spine:
+#   - dry run by default: shows the exact plan, moves nothing
+#   - refuses to clobber work done SINCE the backup: a destination newer
+#     than its backup copy asks first; on a tty-less apply it DEFERS to a
+#     list instead (never clobbers silently)
+#   - deletions: none. Backups stay. Kit-delivered things with no original
+#     (markers, welcome, the book) come out as a watch-list for your hands.
+#   - system files (etc/, usr/, var/) only restore when run with root
+#     rights; without root they are reported so nothing is silently skipped
+#
+# Usage:
+#   doris-backout              dry run
+#   doris-backout --apply      do the restores
+#   doris-backout --apply --quiet   tty-less apply (conflicts deferred+listed)
+
+set -euo pipefail
+
+BACKUP_CANDIDATES=(
+    "${DORIS_BACKUPS:-}"
+    "${DORIS_DIR:-}/backups"
+    "$HOME/DORiS/backups"
+    "./backups"
+)
+BACKUPS=""
+for c in "${BACKUP_CANDIDATES[@]}"; do
+    [[ -n "$c" && -d "$c" ]] && { BACKUPS="$c"; break; }
+done
+if [[ -z "$BACKUPS" ]]; then
+    echo "doris-backout: no backups directory found."
+    echo "  looked for: ${BACKUP_CANDIDATES[*]}"
+    echo "  (set DORIS_BACKUPS=/path/to/backups if the kit lives elsewhere)"
+    exit 2
+fi
+
+APPLY=0; QUIET=0
+for arg in "$@"; do
+    case "$arg" in
+        --apply) APPLY=1 ;;
+        --quiet) QUIET=1 ;;
+        -h|--help) grep '^#' "$0" | head -28; exit 0 ;;
+        *) echo "doris-backout: unknown arg: $arg" >&2; exit 2 ;;
+    esac
+done
+
+say() { echo "doris-backout: $*"; }
+IS_TTY=0; [[ -t 0 ]] && IS_TTY=1
+IS_ROOT=0; [[ "$(id -u)" -eq 0 ]] && IS_ROOT=1
+
+CURRENT_USER="${SUDO_USER:-$USER}"
+CURRENT_HOME="$(getent passwd "$CURRENT_USER" 2>/dev/null | cut -d: -f6)" || true
+[[ -n "$CURRENT_HOME" ]] || CURRENT_HOME="/home/$CURRENT_USER"
+
+mapfile -t SNAPS < <(find "$BACKUPS" -maxdepth 1 -mindepth 1 -type d -name '2*' | sort)
+mapfile -t ZIPS < <(find "$BACKUPS" -maxdepth 1 -name '*.tar.gz' 2>/dev/null | sort)
+
+if [[ ${#SNAPS[@]} -eq 0 ]]; then
+    if ((${#ZIPS[@]})); then
+        say "only tarball(s), no snapshot dirs: $(printf '%s ' "${ZIPS[@]}")"
+        say "  unpack one (tar xzf <it> -C /tmp/opencode) and point DORIS_BACKUPS at the snapshot inside, then re-run."
+    else
+        say "nothing to restore under $BACKUPS"
+    fi
+    exit 0
+fi
+
+# --- plan: deduped by absolute path; NEWER snapshot wins (keeps the latest
+#     backup state; for the true ORIGINAL run backout BEFORE any second run) ---
+declare -A VIA=()
+NONROOT_REPORT=()
+for snap in "${SNAPS[@]}"; do
+    while IFS= read -r -d '' f; do
+        rel="${f#"$snap"/}"
+        case "$rel" in
+            .backout-deferred-*|system/*) continue ;;  # meta + captures
+        esac
+        abs="/$rel"
+        case "$abs" in
+            /etc/*|/usr/*|/var/*|/root/*|/boot/*)
+                if (( IS_ROOT )); then VIA["$abs"]="$snap"
+                else NONROOT_REPORT+=("$abs"); fi ;;
+            "$CURRENT_HOME"/*|/home/*)
+                VIA["$abs"]="$snap" ;;
+        esac
+    done < <(find "$snap" -type f -print0)
+done
+
+say "backups at: $BACKUPS"
+say "snapshots (oldest first): ${SNAPS[*]##*/}"
+say "files planned for restore: ${#VIA[@]}"
+if ((${#NONROOT_REPORT[@]})); then
+    say "system file(s) needing root - reported, not restored this run:"
+    printf '    %s\n' "${NONROOT_REPORT[@]}" | head -10
+fi
+
+if (( APPLY == 0 )); then
+    say "DRY RUN - the plan, nothing moved:"
+    for abs in "${!VIA[@]}"; do
+        echo "  ${VIA[$abs]}  ->  $abs"
+    done | sort -k3
+    exit 0
+fi
+
+conflicts=0
+DEFERRED_LIST="$BACKUPS/.backout-deferred-$(date +%s)"
+: > "$DEFERRED_LIST"
+
+for abs in "${!VIA[@]}"; do
+    snap="${VIA[$abs]}"
+    src="${snap}${abs}"
+    [[ -e "$src" ]] || { say "skip (absent in snapshot): $src"; continue; }
+    # destination: the stored path is authoritative (the real home at
+    # restore time). DORIS_HOME overrides the home-* destinations only -
+    # for sandboxed testing or rescue-to-elsewhere of user files.
+    dest="$abs"
+    if [[ -n "${DORIS_HOME:-}" && "$abs" == "/home/$CURRENT_USER/"* ]]; then
+        dest="$DORIS_HOME/${abs#"/home/$CURRENT_USER/"}"
+    fi
+    if [[ -e "$dest" && "$dest" -nt "$src" ]]; then
+        if (( IS_TTY )) && (( ! QUIET )); then
+            printf '%s is newer than the backup. Overwrite it with the backup? [y/N] ' "$dest"
+            read -r ans
+            case "$ans" in
+                y|Y|yes|Yes) : ;;
+                *) say "deferred: $dest"; echo "$dest" >> "$DEFERRED_LIST"; conflicts=$((conflicts+1)); continue ;;
+            esac
+        else
+            say "deferred (newer than backup, non-interactive): $dest"
+            echo "$dest" >> "$DEFERRED_LIST"
+            conflicts=$((conflicts+1))
+            continue
+        fi
+    fi
+    mkdir -p "$(dirname "$dest")"
+    cp -a "$src" "$dest"
+    case "$dest" in
+        "$DORIS_HOME"/*|"$CURRENT_HOME"/*|/home/*) chown "$CURRENT_USER":"$CURRENT_USER" "$dest" 2>/dev/null || true ;;
+        *) chown root:root "$dest" 2>/dev/null || true ;;
+    esac
+    say "restored: $abs"
+done
+
+if (( conflicts )); then
+    say "deferred ${conflicts} file(s) - list at: $DEFERRED_LIST"
+else
+    say "clean apply - every restorable path restored"
+fi
+
+# --- system-state captures: alternaitves + xdg-mime (root-only) ---
+# These are the values DORiS captured BEFORE it altered system defaults.
+# NONE = there was no previous handler; the group the kit created can go.
+if (( IS_ROOT )); then
+    sysdir="$BACKUPS/system"
+    if [[ -d "$sysdir" ]]; then
+        for cap in "$sysdir"/alternatives-*.txt; do
+            [[ -e "$cap" ]] || continue
+            key="$(basename "$cap" | sed 's/^alternatives-//; s/\.txt$//')"
+            val="$(cat "$cap")"
+            if [[ "$val" == "NONE" || -z "$val" ]]; then
+                update-alternatives --remove-all "$key" 2>/dev/null \
+                    && say "system-state: removed group $key (kit created it; none existed before)" \
+                    || say "system-state: could not remove group $key (info in $cap)"
+            else
+                update-alternatives --set "$key" "$val" 2>/dev/null \
+                    && say "system-state: $key -> $val (previous value)" \
+                    || say "system-state: could not set $key to $val (is it still installed?)"
+            fi
+        done
+        md="$sysdir/xdg-mime-inode-directory.txt"
+        if [[ -e "$md" ]]; then
+            val="$(cat "$md")"
+            u="$(basename "$val" .desktop)"
+            if [[ -n "$val" ]]; then
+                if (( IS_ROOT )) && getent passwd "$CURRENT_USER" >/dev/null 2>&1; then
+                    runuser -u "$CURRENT_USER" -- xdg-mime default "$val" inode/directory 2>/dev/null \
+                        && say "system-state: inode/directory -> $val (previous value)" \
+                        || say "system-state: could not restore xdg-mime default for $CURRENT_USER"
+                fi
+            fi
+        fi
+    fi
+fi
+
+say ""
+say "watch-list (kit-delivered, no original - delete by hand for a pristine box):"
+for f in "$CURRENT_HOME/.config/doris/welcome-shown" "$CURRENT_HOME/what-it-is.md" "$CURRENT_HOME/.config/doris/welcome.txt"; do
+    [[ -e "$f" ]] && echo "  ${f#"$CURRENT_HOME/"}"
+done
+say "~/bin kit scripts stay - they are handy; lockd carries its own uninstall; see README backout section."
+exit 0

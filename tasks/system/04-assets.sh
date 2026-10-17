@@ -108,11 +108,27 @@ fi
 # NOT exist (no package registers them until a DE lands), so --set alone
 # fails with "no alternatives". Fall back to --install, which creates the
 # group, then --set to force our choice (thunar / sublime_text).
+# BACKOUT (2026-10-17, real tester finding): these system-state changes had
+# NO backup path at all - fine on a fresh netinst, rude on a desk that
+# already had its own defaults. We now capture the previous value before
+# touching anything, into ${BACKUP_DIR}/system/; doris-backout can put it
+# back when run with root (sudo doris-backout --apply).
+capture_sysstate() { # capture_sysstate FILENAME "value"
+    if [[ -n "${BACKUP_DIR:-}" && -n "$2" ]]; then
+        mkdir -p "$BACKUP_DIR/system"
+        printf '%s\n' "$2" > "$BACKUP_DIR/system/$1"
+        log "  Previous system-state captured: $1 = $2"
+    fi
+}
+Q_ALT() { update-alternatives --query "$1" 2>/dev/null | awk -F'= ' '$1=="Value:"{print $2}'; }
+
 if command -v thunar >/dev/null 2>&1; then
-    if ! sudo update-alternatives --set x-file-manager /usr/bin/thunar 2>/dev/null; then
-        sudo update-alternatives --install /usr/bin/x-file-manager x-file-manager /usr/bin/thunar 30 2>/dev/null \
+    PREV_FM="$(Q_ALT x-file-manager || true)"
+    capture_sysstate "alternatives-x-file-manager.txt" "${PREV_FM:-NONE}"
+    if ! update-alternatives --set x-file-manager /usr/bin/thunar 2>/dev/null; then
+        update-alternatives --install /usr/bin/x-file-manager x-file-manager /usr/bin/thunar 30 2>/dev/null \
             || warn "update-alternatives x-file-manager failed (is thunar installed?)."
-        sudo update-alternatives --set x-file-manager /usr/bin/thunar 2>/dev/null || true
+        update-alternatives --set x-file-manager /usr/bin/thunar 2>/dev/null || true
     fi
     log "x-file-manager alternative -> thunar."
 else
@@ -120,10 +136,12 @@ else
 fi
 
 if command -v subl >/dev/null 2>&1; then
-    if ! sudo update-alternatives --set x-text-editor /usr/bin/subl 2>/dev/null; then
-        sudo update-alternatives --install /usr/bin/x-text-editor x-text-editor /usr/bin/subl 30 2>/dev/null \
+    PREV_TE="$(Q_ALT x-text-editor || true)"
+    capture_sysstate "alternatives-x-text-editor.txt" "${PREV_TE:-NONE}"
+    if ! update-alternatives --set x-text-editor /usr/bin/subl 2>/dev/null; then
+        update-alternatives --install /usr/bin/x-text-editor x-text-editor /usr/bin/subl 30 2>/dev/null \
             || warn "update-alternatives x-text-editor failed (is sublime-text installed?)."
-        sudo update-alternatives --set x-text-editor /usr/bin/subl 2>/dev/null || true
+        update-alternatives --set x-text-editor /usr/bin/subl 2>/dev/null || true
     fi
     log "x-text-editor alternative -> subl."
 else

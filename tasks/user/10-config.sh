@@ -110,7 +110,22 @@ command -v xdg-user-dirs-update &>/dev/null && xdg-user-dirs-update 2>/dev/null 
 # BUG-007: the SYSTEM-wide x-file-manager alternative is set by task 04
 # (root). Here we only set the per-user inode/directory handler - no sudo, so
 # a plain ./user-setup.sh works without a password prompt. Failures log.
+# BACKOUT (2026-10-17): capture the user's previous inode/directory handler
+# before overwriting, into ${BACKUP_DIR}/system/ - doris-backout restores it.
 if command -v thunar >/dev/null 2>&1; then
+    if [[ -n "${BACKUP_DIR:-}" ]]; then
+        if [[ "$(id -u)" -eq 0 ]]; then
+            mkdir -p "$BACKUP_DIR/system"
+            runuser -u "$CURRENT_USER" -- xdg-mime query default inode/directory 2>/dev/null \
+                > "$BACKUP_DIR/system/xdg-mime-inode-directory.txt" || true
+            log "  Previous inode/directory captured: $(cat "$BACKUP_DIR/system/xdg-mime-inode-directory.txt" 2>/dev/null || echo NONE)"
+        else
+            mkdir -p "$BACKUP_DIR/system"
+            xdg-mime query default inode/directory 2>/dev/null \
+                > "$BACKUP_DIR/system/xdg-mime-inode-directory.txt" || true
+            log "  Previous inode/directory captured: $(cat "$BACKUP_DIR/system/xdg-mime-inode-directory.txt" 2>/dev/null || echo NONE)"
+        fi
+    fi
     if [[ "$(id -u)" -eq 0 ]]; then
         runuser -u "$CURRENT_USER" -- xdg-mime default thunar.desktop \
             inode/directory 2>/dev/null \
