@@ -7,7 +7,10 @@ case $- in
     *i*) ;;
       *) return;;
 esac
-export TZ="America/New_York"
+# keep your dates in YOUR timezone - whatever the box got built in (no
+# restore-time baking: the shell reads the truth itself, so a DORiS clan
+# member on the wrong coast sees the right clock, see kit README notes)
+export TZ="$(cat /etc/timezone 2>/dev/null || readlink -f /etc/localtime 2>/dev/null | sed 's|.*zoneinfo/||' || echo UTC)"
 export VISUAL=nano
 export EDITOR="$VISUAL"
 export PROMPT_COMMAND='LAST_COMMAND_EXIT=$? && history -a && test 127 -eq $LAST_COMMAND_EXIT && head -n -2 $HISTFILE >${HISTFILE}_temp && mv ${HISTFILE}_temp $HISTFILE'

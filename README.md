@@ -163,7 +163,7 @@ file, so a second user — or a re-run — is safe.
 
 | task | what |
 |------|------|
-| 10-config | `config/` → `~/.config`, `bin/` → `~/bin`, `home/` → `~/` (dotfiles + **films.txt**), Thunar scripts, `Pictures/`; `$USER`/`$HOSTNAME` tokens baked in |
+| 10-config | `config/` → `~/.config`, `bin/` → `~/bin`, `home/` → `~/` (dotfiles + **films.txt**), Thunar scripts, `Pictures/`; `$USER`/`$HOSTNAME` tokens baked in; the timezone is *not* baked — `.bashrc` reads the box's own `/etc/timezone` (or `localtime`) at shell start, so any coast works |
 | 12-welcome | generates the first-login welcome from the kit (keybinds, aliases, timers, admin apps, credential nags, dad joke) |
 | 13-lockd | wires **lockd** — one-word encryption (age underneath): Thunar right-click family, `*.age` double-click unlock, Apps-menu launcher, **Ctrl+Alt+E** quick-lock. Originals wiped after byte-verification (`--keep` opts out); your key is born on your first run |
 
