@@ -7,9 +7,13 @@ minimalism. DORiS won't mint that taste; it will *meet* it, though, as it has fo
 ```
 **Stealth edit heads-up because I am lousy with taken for granted stuff**
 
- DORiS absolutely replaces your: **~/.bashrc, .bash_aliases, and .bash_functions** files. I mean, of course it does, DORIS is bash heavy and it's a setup, restoration of digs, so, it forcefully carries and plants those files. It backs everything up, of course, and you can find anything it replaces backed up to **~/DORiS/backups**
- Also, if you're adding your ~/.bashrc file back after installing DORiS, then, you are not really using DORiS. :)
- 
+ DORiS absolutely replaces your: **~/.bashrc, .bash_aliases, and .bash_functions** files.
+ I mean, of course it does, DORIS is bash heavy and it's a setup, restoration of digs, 
+ so, it forcefully carries and plants those files. It backs everything up, of course, and 
+ you can find anything it replaces backed up to **~/DORiS/backups**
+ Also, if you're adding your ~/.bashrc file back after installing DORiS
+ then  you are not really using DORiS. :)
+
 ```
 
 DORiS is a desktop restoration system for **any amd64 machine** running Debian
