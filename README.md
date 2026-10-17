@@ -6,7 +6,7 @@ minimalism. DORiS won't mint that taste; it will *meet* it, though, as it has fo
 
 **Stealth edit heads-up because I am lousy with taken for granted stuff**
 
- DORiS absolutely replaces your ~/.bashrc, .bash_aliases, and .bash_functions files. I mean, of course it does, DORIS is bash heavy and it's a setup, restoration of digs, so, it forcefully carries and plants those files. It backs everything up, of course, and you can find anything it replaces backed up to~/DORiS/backups
+ DORiS absolutely replaces your: **~/.bashrc, .bash_aliases, and .bash_functions** files. I mean, of course it does, DORIS is bash heavy and it's a setup, restoration of digs, so, it forcefully carries and plants those files. It backs everything up, of course, and you can find anything it replaces backed up to **~/DORiS/backups**
 
 DORiS is a desktop restoration system for **any amd64 machine** running Debian
 trixie. It was initially a handy way for me to restore my own setup after a net-install, and it still is, but, being machine agnostic makes it a cool thing to share. Run it after a fresh net-install and it recreates the "DORiS" desktop —
