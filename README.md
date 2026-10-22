@@ -1,141 +1,69 @@
-# DORiS — Debian Openbox Restoration Script
+## DORiS ##
 
-Newcomers don't usually land on Debian + Openbox — that's a choice people make
-after they've been burned by a desktop war, or fallen for the blank-canvas
-minimalism. DORiS won't mint that taste; it will *meet* it, though, as it has for me, and them, and maybe you, too. [Get there from here.](docs/01-the-path.md)
+is a simple, reliable, and robust keyboard driven desktop for the Linux. It's Debian and Openbox, elegant and unobtrusive - easy to get there and easy to use; run the script and enjoy.
 
-```
-**Stealth edit heads-up because I am lousy with taken for granted stuff**
-
- DORiS absolutely replaces your: **~/.bashrc, .bash_aliases, and .bash_functions** files.
- I mean, of course it does, DORIS is bash heavy and it's a setup, restoration of digs, 
- so, it forcefully carries and plants those files. It backs everything up, of course, and 
- you can find anything it replaces backed up to **~/DORiS/backups**
- Also, if you're adding your ~/.bashrc file back after installing DORiS
- then  you are not really using DORiS. :)
-
-```
-
-DORiS is a desktop restoration system for **any amd64 machine** running Debian
-trixie. It was initially a handy way for me to restore my own setup after a net-install, and it still is, but, being machine agnostic makes it a cool thing to share. Run it after a fresh net-install and it recreates the "DORiS" desktop —
-Openbox/X11, keyboard-driven, hardened — from one kit. Everything the restore
-needs is vendored inside this repo, so it works offline: the only network it
-needs is `apt`.
-Menus, keys, firewall, welcome screen. It's a whole 'nother level, right in
-your pocket. Heh, or, at least I think so. I have been running the <a target="_blank" href="https://github.com/tycho-kirchner/fastcompmgr" title="fastcompmgr">fastcompmgr</a> compositor for some years and it's been great so it's included in DORiS run from ~/bin.
+DORiS is a desktop restoration/installation system for **any amd64 machine** running Debian. It was initially a handy way for me to restore my own setup after a net-install, and it still is, but, being machine agnostic makes it a cool thing to share. Run it after a fresh net-install and there you go, sets up a performant Debian and Openbox general purpose desktop — keyboard-driven, hardened — from one kit. Everything the restore needs is vendored inside this repo, so it works offline: the only network it needs is `apt`. I have been running the <a target="_blank" href="https://github.com/tycho-kirchner/fastcompmgr" title="fastcompmgr">fastcompmgr</a> compositor for some years and it's been great so it's included in DORiS run from ~/bin.
 
 ![The DORiS desktop](docs/images/doris1.jpg)
 *DORiS desktop — Openbox, keyboard-driven, tuned. Gruvbox-dark shown, nord is in there, too, gnome apps cooperate; it's all good. In fact, hit c'tarl+shift+t one time.*
 
-## Why DORiS
 
-DORiS is a disposition, I think: a humanist's way of computing, and the machine bends to how you or I think, not the other way around. The hundred(s) hours of "how I like my box" finally codified, so a fresh install comes out the other side done and done. Really, it's just digs on Debian, but, they's good digs. I mean, why build a distro when you can just Debian, whiff?
+[**Get there from here.**](docs/01-the-path.md)
 
-What you get is a solid, reliable 'workstation' already well provisioned with a butt-load of handy function at the ready — a keybind or a handy alias or a script
-away. Add or remove what you like to make DORiS even better for you, if you like, and it's easy to do so. Everything works every time, all of the time, the way you actually want it to. This is a proper desktop paradigm. Robust. Reliable. The kind you can be productive on all day because I am becuase DORiS is my desktop on Debian Linux that I have been using reliably for...decades, small tweaks notwithstanding. 
+Install Debian with the net-installer, probably easiest to use advanced, expert install (text). Enable a root account (give root a password) and when it's time to install software, uncheck everything but standard system tools - DORiS is a custom box; built, like you want.
 
-**Whaddya want for nuthin'?**
+## My workflow is like this post Debian install: ##
 
-## Try it in a VM — 30 minutes
+**the prep**
+```sh
+  log in as root
+  install: git aptitude sudo
+  run visudo to add my user like: $USER ALL=(ALL:ALL) NOPASSWD:ALL
+  log out of root
+  log into user account
+```
+**grab DORiS and install**
+```sh
+  git clone https://github.com/rabmach/DORiS
+  cd DORiS/
+  sudo ./restore.sh
+  go have a smoke
+  ./user-setup.sh
+  sudo systemctl reboot
+```
 
-Don't want to touch your daily driver? Restore a disposable QEMU guest and
-watch the kit work end to end.
+First-login welcome screen greets you with keybinds and whatnot. DORiS also creates a handy what-it-is doc for every new user on the box. It's called, *clears throat*, what-it-is.md and lives in ~/
 
-1. Grab the [Debian trixie netinst ISO](https://www.debian.org/distrib/netinst).
-2. Create a disk and boot the installer with KVM:
+Vendor firmware (Intel/AMD microcode, VA-API drivers) is auto-detected at install time, and hardware-specific extras are optional overlays that never touch the core kit. Wifi works out of the box on the common laptop cards — NetworkManager is installed and handles it, firmware for Intel/Realtek/Atheros/Broadcom/MediaTek is in the core list, and joining a network is `nmtui` in any terminal (or the panel applet).
 
-   ```sh
-   qemu-img create -f qcow2 doris-test.qcow2 20G
-   qemu-system-x86_64 -enable-kvm -m 4096 -cpu host \
-     -cdrom debian-trixie-netinst.iso \
-     -hda doris-test.qcow2 \
-     -netdev user,id=n0 -device e1000,netdev=n0 -boot d
-   ```
 
-   No KVM? Swap `-enable-kvm -cpu host` for `-accel tcg` — slower, works anywhere.
+## The kit layout
 
-3. Net-install as normal: a root password, your user added to sudo, "standard
-   system utilities" only. Reboot — this time boot the disk (`-boot c`, no
-   `-cdrom`).
-4. As your new user:
+```
+DORiS/
+├── restore.sh            system runner (root)
+├── user-setup.sh         per-user runner
+├── lib.sh                shared library (network/dns/backup/token helpers)
+├── packages/             core.list + extras.list
+├── tasks/
+│   ├── system/           00-check … 06-verify
+│   └── user/             10-config, 12-welcome
+├── config/               ~/.config (tokenized with $USER / $HOSTNAME)
+├── home/                 dotfiles + films.txt
+├── bin/                  ~/bin scripts (incl. doris-welcome)
+├── local/share/          icons, themes, fonts, Thunar scripts (→ /usr/share)
+├── Pictures/backgrounds/ wallpapers
+├── hardening/            nftables, journald, udev, systemd, cron, sysctl.d, loginfetch
+└── tools/                selftest.sh, mkwelcome.sh, capture.sh, scrub.sh
+```
 
-   ```sh
-   sudo apt-get install -y git
-   git clone https://github.com/rabmach/DORiS ~/DORiS
-   cd ~/DORiS
-   sudo ./restore.sh     # system half
-   ./user-setup.sh       # per-user half
-   ```
+`$USER` and `$HOSTNAME` are baked into config files at restore time; executables
+resolve `$HOME` in config files at runtime, so the kit ships no hardcoded usernames or hostnames
+(hostnames change between installs — they're tokenized, not captured).
+`tools/selftest.sh` checks that before every restore (and you can run it by hand).
 
-5. `startx` and meet your new desktop. QEMU's user-network gateway (`10.0.2.2`)
-   counts as a trusted LAN, so the kit picks the router DNS posture
-   automatically.
 
-## The docs
-
-* [**00 — The Big Picture**](docs/00-big-picture.md) — quick version first,
-  then the architecture exploded: the two halves, the restore flow, task by
-  task, the supporting machinery, and the honest limits.
-* [**01 — The Path**](docs/01-the-path.md) — what you need, the concepts,
-  and the step-by-step from fresh net-install to running DORiS.
-* [**03 — The Decision Journal**](docs/03-decision-journal.md) — every real
-   decision in the kit, with the if/then/buts: why Openbox, why bash, why the
-   firewall has an all-TCP outbound, why the kit split in two.
-* [**04 — The Bug Log**](docs/04-bug-log.md) — the bugs that survived to a
-  real machine: fresh-install ownership, the invisible task failure, the
-  stale key pin. Each with root cause and fix, kept as a teaching record.
-
-## The quick version
-
-1. Net-install Debian trixie. Create a root password and standard system utilities only (Software).
-2. As root, prepare your user:
-
-   ```sh
-   apt-get update && apt-get install -y git sudo
-   adduser <youruser>
-   adduser <youruser> sudo
-   echo '<youruser> ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/<youruser>
-   reboot
-   ```
-
-3. Get the kit onto the machine either way:
-
-   **cloned repo:**
-   ```sh
-   git clone https://github.com/rabmach/DORiS ~/DORiS
-   cd ~/DORiS
-   ```
-   **backup drive:**
-   ```sh
-   sudo mount /dev/<backupdrive> /mnt
-   cd /mnt/DORiS
-   ```
-
-   Then run the two halves:
-
-   ```sh
-   sudo ./restore.sh          # system half (needs root)
-   ./user-setup.sh            # per-user half (bakes $USER/$HOSTNAME into configs)
-   ```
-
-4. Reboot. `startx` (or configure auto-login). The first-login welcome
-   screen greets you with keybinds, aliases, timers and the one-time
-   credential chores. DORiS also creates a handy what-it-is doc for
-   every new user on the box. It's called, *clears throat*, what-it-is.
-
-The kit can live anywhere and DORiS doesn't care: `~/DORiS` from a `git
-clone`, a mounted backup drive (`/mnt/…`), a USB stick, whatever. You just
-run it from wherever it is. (`$DORIS_DIR` is resolved from the script's own
-location, never from a hardcoded path.)
-
-Machine-agnostic by design: vendor firmware (Intel/AMD microcode, VA-API
-drivers) is auto-detected at install time, and hardware-specific extras are
-optional overlays that never touch the core kit. Wifi works out of the box
-on the common laptop cards — NetworkManager runs the wires and the airwaves,
-firmware for Intel/Realtek/Atheros/Broadcom/MediaTek is in the core list,
-and joining a network is `nmtui` in any terminal (or the panel applet).
-
-DORiS splits into two halves:
+**DORiS is split into two halves:**
 
 | half | script | when | does what |
 |------|--------|------|-----------|
@@ -145,6 +73,26 @@ DORiS splits into two halves:
 Run the system half once, then the per-user half for every user who logs
 in on that machine. Both are idempotent and back up before they touch a
 file, so a second user — or a re-run — is safe.
+
+## Options
+
+```
+sudo ./restore.sh                # full system restore
+sudo ./restore.sh --list         # show system tasks
+sudo ./restore.sh --only 03      # run just one task
+sudo ./restore.sh --skip 05      # skip a task (repeatable)
+sudo ./restore.sh --dry-run      # print what would run
+sudo ./restore.sh --ask          # confirm each task
+sudo ./restore.sh --extras       # also install packages/extras.list
+
+./user-setup.sh                  # set up the invoking user
+sudo ./user-setup.sh --user bob  # set up another user
+./user-setup.sh --list           # show per-user tasks
+./user-setup.sh --dry-run        # print what would run
+```
+
+Env vars: `DORIS_ASK=1`, `DORIS_EXTRAS=1`, `DNS_SERVER=…`.
+
 
 ## What the system half does
 
@@ -165,15 +113,8 @@ file, so a second user — or a re-run — is safe.
 |------|------|
 | 10-config | `config/` → `~/.config`, `bin/` → `~/bin`, `home/` → `~/` (dotfiles + **films.txt**), Thunar scripts, `Pictures/`; `$USER`/`$HOSTNAME` tokens baked in; the timezone is *not* baked — `.bashrc` reads the box's own `/etc/timezone` (or `localtime`) at shell start, so any coast works |
 | 12-welcome | generates the first-login welcome from the kit (keybinds, aliases, timers, admin apps, credential nags, dad joke) |
-| 13-lockd | wires **lockd** — one-word encryption (age underneath): Thunar right-click family, `*.age` double-click unlock, Apps-menu launcher, **Ctrl+Alt+E** quick-lock. Originals wiped after byte-verification (`--keep` opts out); your key is born on your first run |
+| 13-lockd | wires **lockd** — one-word encryption (age underneath): Thunar right-click family, `*.age` double-click unlock, Apps-menu launcher, **Ctrl+Alt+E** quick-lock. Originals wiped after byte-verification (`--keep` opts out); your key is born on your first run, backed-up at ~/Desktop|
 
-## Related
-
-DORiS is the foundation; the handy tools are the family that lives on it. Two ship in the kit:
-
-- **lockd** — one-word file/directory encryption, right-click to keybind. On by default: it's a *function*, not a taste. Standalone repo: [rabmach/lockd](https://github.com/rabmach/lockd) (DORiS embeds a snapshot; the repo is upstream-of-record).
-
-Others (brenda, nina, RandomLitB, george) live on their own — clone what you want. brenda can be pretty handy; george (keyboard-first dashboard/command center) is all-inclusive at [rabmach/george](https://github.com/rabmach/george) and it's silly and noboody asked for it, ever, and it's awesome.
 
 ## Applying updates
 
@@ -182,6 +123,7 @@ To apply a kit update, re-run the half that owns the changed task:
 
 * system-level changes (`tasks/system/*`, e.g. `update-alternatives`,
   nftables, sysctl, packages) → `sudo ./restore.sh`
+
 * user-level changes (`tasks/user/*`, `config/`, `bin/`) →
   `./user-setup.sh`
 
@@ -257,6 +199,10 @@ config (no state file to go stale) and backs up every file it touches as
 flips without the popup. Both theme sets ship in the kit, so the flip works
 on a fresh install before you've touched anything.
 
+## lockd
+
+ One-word and very handy file/directory encryption, right-click to keybind. On by default: it's a *function*, not a taste. Standalone repo: [rabmach/lockd](https://github.com/rabmach/lockd) (DORiS embeds a snapshot; the repo is upstream-of-record).
+
 ## Backing out — the wrist-flick undo
 
 DORiS is a decision, not an app: it *replaces* your shell files, sets
@@ -279,67 +225,6 @@ the xdg-mime handler) back to values the kit *captured before altering
 them*. Nothing gets deleted by backout itself; the backup stays until you
 personally shred it. See `doris-backout --help` for knobs.
 
-## Options
-
-```
-sudo ./restore.sh                # full system restore
-sudo ./restore.sh --list         # show system tasks
-sudo ./restore.sh --only 03      # run just one task
-sudo ./restore.sh --skip 05      # skip a task (repeatable)
-sudo ./restore.sh --dry-run      # print what would run
-sudo ./restore.sh --ask          # confirm each task
-sudo ./restore.sh --extras       # also install packages/extras.list
-
-./user-setup.sh                  # set up the invoking user
-sudo ./user-setup.sh --user bob  # set up another user
-./user-setup.sh --list           # show per-user tasks
-./user-setup.sh --dry-run        # print what would run
-```
-
-Env vars: `DORIS_ASK=1`, `DORIS_EXTRAS=1`, `DNS_SERVER=…`.
-
-## The kit layout
-
-```
-DORiS/
-├── restore.sh            system runner (root)
-├── user-setup.sh         per-user runner
-├── lib.sh                shared library (network/dns/backup/token helpers)
-├── packages/             core.list + extras.list
-├── tasks/
-│   ├── system/           00-check … 06-verify
-│   └── user/             10-config, 12-welcome
-├── config/               ~/.config (tokenized with $USER / $HOSTNAME)
-├── home/                 dotfiles + films.txt
-├── bin/                  ~/bin scripts (incl. doris-welcome)
-├── local/share/          icons, themes, fonts, Thunar scripts (→ /usr/share)
-├── Pictures/backgrounds/ wallpapers
-├── hardening/            nftables, journald, udev, systemd, cron, sysctl.d, loginfetch
-└── tools/                selftest.sh, mkwelcome.sh, capture.sh, scrub.sh
-```
-
-`$USER` and `$HOSTNAME` are baked into config files at restore time; executables
-resolve `$HOME` in config files at runtime, so the kit ships no hardcoded usernames or hostnames
-(hostnames change between installs — they're tokenized, not captured).
-`tools/selftest.sh` checks that before every restore (and you can run it by hand).
-
-## Known limitations (honest gaps)
-
-* **Openbox/X11 only** — no Wayland configuration. DORiS detects a Wayland
-  session and warns, then stays X11. I built-up a labwc desktop tjhis summer and it was fine and it was also a pain in the ass; currently. Will revisit. 
-* **amd64 Debian trixie only** — that's the supported surface; Debian stable.
-* **Opinionated by design** — it recreates this way of computing, not a menu
-  of desktop choices. Your keys, your panel, your wallpapers, a config'd reliable setup.
-* **Outbound firewall is all-TCP** — FTPS passive data channels negotiate
-  their port *inside* TLS, so they can't be allowlisted; filtering is
-  enforced at the DNS layer instead (decision journal, D11).
-* **AppArmor is stock Debian** — the distro's profiles load as shipped;
-  DORiS adds no profiles and no audit layer (decided 2026-09-14; see the
-  decision journal).
-
-Feedback, ideas, bugs: open an issue, or tell me where you'd have decided
-differently — the [decision journal](docs/03-decision-journal.md) lists every
-trade-off I made, and I'd genuinely like yours.
 
 ## Rebuilding the kit from a live box
 
@@ -352,6 +237,55 @@ cd ~/DORiS && tools/capture.sh && tools/scrub.sh
 result and strips usernames and runtime junk - and stops you cold if a
 real key (weather, pianobar, nextdns) is still in there. Review the diff
 before committing.
+
+## Try it in a VM
+
+Try DORiS real quick on a disposable QEMU guest and
+watch the kit work end to end.
+
+1. Grab the [Debian trixie netinst ISO](https://www.debian.org/distrib/netinst).
+2. Create a disk and boot the installer with KVM:
+
+   ```sh
+   qemu-img create -f qcow2 doris-test.qcow2 20G
+   qemu-system-x86_64 -enable-kvm -m 4096 -cpu host \
+     -cdrom debian-trixie-netinst.iso \
+     -hda doris-test.qcow2 \
+     -netdev user,id=n0 -device e1000,netdev=n0 -boot d
+   ```
+
+   No KVM? Swap `-enable-kvm -cpu host` for `-accel tcg` — slower, works anywhere.
+
+3. Net-install as normal: a root password, your user added to sudo, "standard
+   system utilities" only. Reboot — this time boot the disk (`-boot c`, no
+   `-cdrom`).
+4. As your new user:
+
+   ```sh
+   sudo apt-get install -y git
+   git clone https://github.com/rabmach/DORiS ~/DORiS
+   cd ~/DORiS
+   sudo ./restore.sh     # system half
+   ./user-setup.sh       # per-user half
+   ```
+
+5. `startx` and meet your new desktop. QEMU's user-network gateway (`10.0.2.2`)
+   counts as a trusted LAN, so the kit picks the router DNS posture
+   automatically.
+
+## The docs, related
+
+* [**00 — The Big Picture**](docs/00-big-picture.md) — quick version first,
+  then the architecture exploded: the two halves, the restore flow, task by
+  task, the supporting machinery, and the honest limits.
+* [**01 — The Path**](docs/01-the-path.md) — what you need, the concepts,
+  and the step-by-step from fresh net-install to running DORiS.
+* [**03 — The Decision Journal**](docs/03-decision-journal.md) — every real
+   decision in the kit, with the if/then/buts: why Openbox, why bash, why the
+   firewall has an all-TCP outbound, why the kit split in two.
+* [**04 — The Bug Log**](docs/04-bug-log.md) — the bugs that survived to a
+  real machine: fresh-install ownership, the invisible task failure, the
+    stale key pin. Each with root cause and fix, kept as a teaching record.
 
 ---
 
