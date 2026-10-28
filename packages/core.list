@@ -46,6 +46,7 @@ menu-xdg
 xdg-utils
 xdg-user-dirs-gtk
 obsession
+minder
 
 # --- browsers (both from external repos in task 01) ---
 firefox
@@ -75,23 +76,19 @@ sublime-text
 filezilla
 libreoffice
 libreoffice-gtk3
-solaar
 pavucontrol
 seahorse
 gnome-keyring
 rednotebook
-papers
+xpdf
 yt-dlp
 nmap
-catfish
 zenity
 planner
 neverputt
-vym
-#freeplane   # NOT in the trixie archive (Debian dropped it: 1.7.x needs an old JRE).
-#            # Install the upstream .deb manually if wanted (freeplane.org / sourceforge).
 hplip-gui
 fuse
+libfuse2t64
 
 # --- media / art / imaging ---
 mpv
