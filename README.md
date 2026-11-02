@@ -132,7 +132,7 @@ done steps are skipped, and nothing is re-downloaded. If in doubt, run the
 system half too — it re-verifies what matters (task 06) rather than
 wrecking anything.
 
-## Security
+## Security (Safety, really)
 
 Two postures, decided automatically at runtime:
 
